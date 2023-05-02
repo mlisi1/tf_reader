@@ -98,25 +98,25 @@ class SelectScalarWin(tk.Toplevel):
         #Network size option Menu and Label initialization
         self.size_label = ttk.Label(self, text  = "Network Size:")
         self.size_label.place(x = 10, y = 190)
-        self.size_option = ttk.OptionMenu(self, self.parent.size_choice, *self.parent.sizes, command = self.choose_size)
+        self.size_option = ttk.OptionMenu(self, self.parent.size_choice, self.parent.size_choice.get(), *self.parent.sizes, command = self.choose_size)
         self.size_option.place(x = 10, y = 210)
 
         #Scalar Tag option Menu and Label
         self.option_label = tk.Label(self, text = "Scalars Tag:")
         self.option_label.place(x = 10, y = 130)
-        self.option_menu = ttk.OptionMenu(self, self.parent.tag_choice, *self.parent.tags)#, command = self.parent.update_plot)
+        self.option_menu = ttk.OptionMenu(self, self.parent.tag_choice, self.parent.tag_choice.get(), *self.parent.tags)#, command = self.parent.update_plot)
         self.option_menu.place(x = 10, y = 150)
 
         #Model Tag option Menu and Label
         self.model_option_label = tk.Label(self, text = "Model Tags:")
         self.model_option_label.place(x = 10, y = 10)
-        self.model_options = ttk.OptionMenu(self, self.parent.model_choice, *self.parent.available_models)#, command = self.parent.update_scalars)
+        self.model_options = ttk.OptionMenu(self, self.parent.model_choice, self.parent.model_choice.get(), *self.parent.available_models)#, command = self.parent.update_scalars)
         self.model_options.place(x = 10, y = 30)
 
         #Reward Tag option Menu and Label
         self.reward_option_label = tk.Label(self, text = "Reward Tags:")
         self.reward_option_label.place(x = 10, y = 70)
-        self.reward_options = ttk.OptionMenu(self, self.parent.reward_choice, *self.parent.available_rewards)#, command = self.parent.update_scalars)
+        self.reward_options = ttk.OptionMenu(self, self.parent.reward_choice, self.parent.reward_choice.get(), *self.parent.available_rewards)#, command = self.parent.update_scalars)
         self.reward_options.place(x = 10, y = 90)        
 
         #Select Button

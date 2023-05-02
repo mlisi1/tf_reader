@@ -88,11 +88,11 @@ class SessionLoader:
 						#Append [session, session_name]
 						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])			
 				
-				#All sizes selected				
-				if batch == 0 and hid == 0:
+					#All sizes selected				
+					if batch == 0 and hid == 0:
 
-					#Append [session, session_name]
-					tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])				
+						#Append [session, session_name]
+						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])				
 
 				#All reward selectted
 				if reward == "All":
