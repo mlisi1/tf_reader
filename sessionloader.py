@@ -1,4 +1,5 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from params import TrainingParameters
 import re
 from typing import List, Type
@@ -46,11 +47,71 @@ class SessionLoader:
 	def __init__(self, trainings_dir):
 
 		#Initialize sessions' arrays
-		#tags should be in a dict
+		#>dict has been added, but is not fully integrated in the system; TFReaerWin could use it for labels
 		self.trainings_dir = trainings_dir
 		self.model_tags = []
 		self.reward_tags = []
 		self.sessions = []
+		self.model_dict = {}
+
+	#Updates model tags dict assigning every folder to its model tag combination
+	def update_tags_dict(self, folder_name,):       
+        
+        #Find matches
+		pattern = r'(.*) \| (.*)'
+		match = re.match(pattern, folder_name)
+
+		if match:
+
+			#Strip tags of unnecessary characters
+		    model_tags = match.group(1).strip("Ant ")
+
+		    #Create entry if new; else append to existing values
+		    if model_tags in self.model_dict:
+		  
+		        self.model_dict[model_tags].append(folder_name)
+		    else:
+		        self.model_dict[model_tags] = [folder_name]
+
+	#Retrives correct session folder after model and reward tags
+	def retrieve_folder(self, model, reward):
+
+   		
+		mod = model.strip('Ant ')
+		rew = reward
+
+
+		for key in self.model_dict.keys():
+
+			#All models selected
+			if model == "All":
+
+				for value in self.model_dict[key]:
+
+					#All reward selected
+					if rew == "All":
+
+						yield value
+
+					#Check reward
+					if value.endswith(rew):
+
+						yield value
+
+			#Check model
+			if mod == key and key.endswith(mod):
+				
+				for value in self.model_dict[mod]:
+
+					#All reward selected
+					if rew == "All":
+
+						yield value
+
+					#Check reward
+					if value.endswith(rew):
+
+						yield value
 
 	#Main loading function; called in a multiprocessing Pool
 	def process_session(self, session):
@@ -65,83 +126,36 @@ class SessionLoader:
 		return string
 
 	#Scalar retrieval function; checks all the selected tags
-	def get_scalar_from_tags(self, model, reward, batch = 0, hid = 0):		
+	def get_scalar_from_tags(self, model, reward, batch = 0, hid = 0):      
 
 
 		tmp = []
-		
+
+		#Find only relevant session folders
+		selected_folder_iterator = self.retrieve_folder(model, reward)
+
 		#Initialize pool
 		pool = Pool(processes = 10)
 
+		for folder in selected_folder_iterator:
 
-		for session in self.sessions:
-
-			#Check for model tag match
-			if model in session.tags_dir and model != "All":
-
-				#Check for reward tag matcch
-				if session.tags_dir.endswith(reward) and reward != "All":
-
-					#Check for size matches											
-					if session.params[0].batch_size == batch and session.params[0].hidden_size == hid and batch != 0 and hid != 0:
-
-						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])			
+			
+			for session in self.sessions:
 				
-					#All sizes selected				
-					if batch == 0 and hid == 0:
+				if folder+'/' in session.tf_events_path:
 
-						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])				
-
-				#All reward selectted
-				if reward == "All":
-						
-					#Check for reward tag matches
+					#Check for size matches                                         
 					if session.params[0].batch_size == batch and session.params[0].hidden_size == hid and batch != 0 and hid != 0:
 
 						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])					
-					
-					#All sizes selected		
+						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])          
+
+					#All sizes selected             
 					if batch == 0 and hid == 0:
 
 						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])
-
-			#All model selected
-			if model == "All":
-
-				#Check for reward tag match
-				if session.tags_dir.endswith(reward) and reward != "All":
-
-					#Check for reward tag matches
-					if session.params[0].batch_size == batch and session.params[0].hidden_size == hid and batch != 0 and hid != 0:
-
-						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])					
-					
-					#All sizes selected		
-					if batch == 0 and hid == 0:
-
-						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])
-
-				#All rewards selected
-				if reward == "All":
-					
-					#Check for reward tag matches
-					if session.params[0].batch_size == batch and session.params[0].hidden_size == hid and batch != 0 and hid != 0:
-
-						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])					
-					
-					#All sizes selected		
-					if batch == 0 and hid == 0:
-
-						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])
-
+						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])                     
+           
 		return tmp
 
 
@@ -149,55 +163,57 @@ class SessionLoader:
 	#>exclude_faults = True discards training with a valid tag name but that ends with .something
 	def parse_sessions(self, exclude_faults=True):
 
-		#Reset tags
-	    self.model_tags = []
-	    self.reward_tags = []
+        #Reset tags
+		self.model_tags = []
+		self.reward_tags = []
 
-	    #Go to trainings dir
-	    os.chdir(self.trainings_dir)
+        #Go to trainings dir
+		os.chdir(self.trainings_dir)
 
-	    for directory in glob.glob('*'):
+		for directory in glob.glob('*'):
 
-	    	#Exclude every dir ending in .something
-	        if exclude_faults and '.' in directory:
-	            continue
+            #Exclude every dir ending in .something
+			if exclude_faults and '.' in directory:
+				continue
 
-	        #Split dir name string
-	        model_tags, reward_tags = directory.split('|')
 
-	        #Generate model and reward tags "dict"
-	        #>should be changed into a real dict later
-	        if model_tags not in self.model_tags:
-	            self.model_tags.append(model_tags)
+			self.update_tags_dict(directory)
+			#Split dir name string
+			model_tags, reward_tags = directory.split('|')
 
-	        if reward_tags not in self.reward_tags:
-	            self.reward_tags.append(reward_tags)
-	       	
-	        #Get different training in model|reward dirs
-	        sub_models = glob.glob(glob.escape(f'{directory}')+'/*')
+			#Generate model and reward tags "dict"
+			#>should be changed into a real dict later
+			if model_tags not in self.model_tags:
+				self.model_tags.append(model_tags)
 
-	        for model in sub_models:
+			if reward_tags not in self.reward_tags:
+				self.reward_tags.append(reward_tags)
+            
+			#Get different training in model|reward dirs
+			sub_models = glob.glob(glob.escape(f'{directory}')+'/*')
 
-	        	#Assign values to training session
-	        	temp = TrainingSession()
-		        temp.model_tags = model_tags
-		        temp.reward_tags = reward_tags
-		        temp.tags_dir = directory
+			for model in sub_models:
 
-		        #Retrieve .params file
-		        #>a dataclass printed to the file during training
-		        params_path = glob.glob(glob.escape(f"{model}")+"/*/*.params")[0]	      		  	
-		        temp.params_path = params_path
+				#Assign values to training session
+				temp = TrainingSession()
+				temp.model_tags = model_tags
+				temp.reward_tags = reward_tags
+				temp.tags_dir = directory
 
-		        #Parse .params file
-		        temp.params = self.read_dataclass_file(params_path, TrainingParameters)
+				#Retrieve .params file
+				#>a dataclass printed to the file during training
+				params_path = glob.glob(glob.escape(f"{model}")+"/*/*.params")[0]                   
+				temp.params_path = params_path
 
-		        #Retrieve tf_events file path
-	        	tf_events_path = glob.glob(glob.escape(f"{model}")+"/*/*/events*")[0]	        
-	        	temp.tf_events_path = tf_events_path
+				#Parse .params file
+				temp.params = self.read_dataclass_file(params_path, TrainingParameters)
 
-	        	
-	        	self.sessions.append(temp)
+				#Retrieve tf_events file path
+				tf_events_path = glob.glob(glob.escape(f"{model}")+"/*/*/events*")[0]           
+				temp.tf_events_path = tf_events_path
+
+
+				self.sessions.append(temp)
 
 
 	#Dataclass parsing function; used to read training dataclass file
