@@ -1,6 +1,7 @@
 # TF Reader
 ## What is TF Reader?
-TF Reader is an offline alternative to <a href="https://www.tensorflow.org/tensorboard">TensorBoard</a> that I created while working on a Reinforcement Learning project. I found TensorBoard to be limited for the use I had in mind, specifically with regard to the thorough division of Scalars and the ability to display custom plots.
+TF Reader is an offline alternative to <a href="https://www.tensorflow.org/tensorboard">TensorBoard</a> that I created while working on a Reinforcement Learning project. I found TensorBoard to be limited for the use I had in mind, specifically with regard to the thorough division of Scalars and the ability to display custom plots. This project also features <a href="https://github.com/rdbende/Azure-ttk-theme">Azure ttk theme</a>.
+
 
 Although the scope of this app is narrow and its usage is constrained by my personal use cases, I plan to maintain this project in my free time and share it, as it may be helpful to others.
 
