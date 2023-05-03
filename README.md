@@ -20,7 +20,7 @@ The features implemented at the moment are the following:
 ![alt text](http://url/to/img.png)
 
 
-![alt text]([http://url/to/img.png](https://www.mediafire.com/view/xln9gbfbw94iynf))
+![alt text](https://imgur.com/hKBDgYK)
 
 
 
