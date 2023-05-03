@@ -1,10 +1,10 @@
 # TF Reader
 ## What is TF Reader?
-TF Reader is an offline alternative to TensorBoard that I created while working on a Reinforcement Learning project. I found TensorBoard to be limited for the use I had in mind, specifically with regard to the thorough division of Scalars and the ability to display custom plots.
+TF Reader is an offline alternative to <a href="https://www.tensorflow.org/tensorboard">TensorBoard</a> that I created while working on a Reinforcement Learning project. I found TensorBoard to be limited for the use I had in mind, specifically with regard to the thorough division of Scalars and the ability to display custom plots.
 
 Although the scope of this app is narrow and its usage is constrained by my personal use cases, I plan to maintain this project in my free time and share it, as it may be helpful to others.
 
-TF Reader is built using the ```tkinter``` GUI and embedded with ```matplotlib``` to plot training results from TensorBoard binary files using ```tbparse``` SummaryReader. Since loading all detected files at the start of the program would take too long, the program saves every training session and relevant file path in an internal dataclass and only loads the data when it's requested for plotting.
+TF Reader is built using the ```tkinter``` GUI and embedded with ```matplotlib``` to plot training results from TensorBoard binary files using ```tbparse``` <a href="https://github.com/j3soon/tbparse">SummaryReader</a>. Since loading all detected files at the start of the program would take too long, the program saves every training session and relevant file path in an internal dataclass and only loads the data when it's requested for plotting.
 
 Currently, the app only supports plotting Scalars, but more features will be added in the future.
 
