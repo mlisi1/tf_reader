@@ -2,6 +2,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import re
 from functools import partial
+import numpy as np
 
 
 
@@ -123,6 +124,7 @@ class TFReaderWin(tk.Tk):
     #Retrieves the set of tags found in the scalar
     ##At the moment it is used only for initialization purposes; the tags cannot be updated at a second moment
     def get_tags(self):
+
 
         for tag in self.scalars[0]['tag']:
 
@@ -253,6 +255,37 @@ class TFReaderWin(tk.Tk):
 
             if self.frame is not None:
                 self.frame.scalar_name.append(self.get_tag_choice)
+
+
+           
+       
+
+        if len(self.scalars) > 1:
+            
+            #Append max average reward during test for each scalar
+            max_test_value = np.empty(0)
+            for i in range(len(self.scalars)):
+        
+                for tag in self.scalars[i]['tag']:
+
+                    if "Avg" in tag and "Network" in tag and "Test" in tag and not "Best" in tag:
+
+                        x = self.scalars[i][self.scalars[i]['tag'].values == tag]
+                        max_test_value = np.append(max_test_value, x['value'].values[-1])
+                        break
+
+
+            #Sort the array and get the indexes
+            indexes = np.argsort(max_test_value)[::-1] 
+                 
+            # self.scalars = self.scalars[indexes]
+            self.scalars = [self.scalars[i] for i in indexes]
+            self.scalar_names = [self.scalar_names[i] for i in indexes]
+            self.params = [self.params[i] for i in indexes]       
+
+
+               
+
 
         #Update plot
         if self.frame is not None:

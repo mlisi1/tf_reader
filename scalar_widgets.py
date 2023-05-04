@@ -44,9 +44,6 @@ class PlotContainer(ttk.Frame):
         self.colors = []
         self.data = []  
 
-        # print(self.data)
-        # print(self.scalars)
-
         #Translate scalars to arrays
         self.data_from_scalar()    
 
@@ -84,7 +81,7 @@ class PlotContainer(ttk.Frame):
         #Delete previous data
         del self.data
         self.data = []  
-        # print(self.scalar_name)
+        
 
         #Gather correct values
         for i in range(len(self.scalars)):
