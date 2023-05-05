@@ -17,6 +17,8 @@ The features implemented at the moment are the following:
 + Curves on the plot can be smoothed via slider
 + Training specific dataclass is read and showed in a scalar-specific Info window
 + Scalar is highlited in the plot when the mouse hovers its label
++ Scalars are ordered based on how well they performed on average during test
++ A list of the scalars plotted can now be saved in a .txt file
 
 
 <div style="display: flex;">
