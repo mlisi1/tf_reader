@@ -2,6 +2,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import re
 from functools import partial
+import datetime
 import numpy as np
 
 
@@ -34,6 +35,8 @@ class TFReaderWin(tk.Tk):
         self.grid_rowconfigure(10, weight=1)
         self.grid_columnconfigure(20, weight=1)
 
+        self.root_dir = os.getcwd()
+
         #Plot container initialization
         self.container = ttk.Frame(self)
         self.container.grid(row = 0, rowspan = 10, column = 0, columnspan = 10)
@@ -41,12 +44,18 @@ class TFReaderWin(tk.Tk):
         self.container.grid_columnconfigure(0, weight=10)   
         
         #Scalar list frame initialization
-        self.scalar_container = ScrollableFrame(self, 20, 2, width = 260, height = 360)
-        self.scalar_container.grid(row = 8, column = 20) 
+        self.scalar_container = ScrollableFrame(self, 20, 2, width = 260, height = 300)
+        self.scalar_container.grid(row = 6, column = 20) 
+
+
+        self.save_butt = ttk.Button(self, text = "Save scalar data", command = self.save_scalar_data)
+        self.save_butt.state(["disabled"])
+        self.save_butt.place(x = 700, y = 460)
 
         #Array of scalars and their relative parameters
         self.scalars = []
         self.params = []
+        self.max_values = []
 
         #SessionLoader; handles workdir scanning and file loading/parsing
         self.loader = SessionLoader(workdir)
@@ -166,9 +175,14 @@ class TFReaderWin(tk.Tk):
         del self.scalars 
         del self.scalar_names
         del self.params 
+        del self.max_values
         self.scalars = []
         self.scalar_names = []
         self.params = []
+        self.max_values = []
+
+        #Deactivate save button
+        self.save_butt.state(["disabled"])
 
         #The low level clear function
         self.frame.clear()
@@ -277,11 +291,15 @@ class TFReaderWin(tk.Tk):
 
             #Sort the array and get the indexes
             indexes = np.argsort(max_test_value)[::-1] 
+            self.max_values = np.sort(max_test_value)[::-1]
                  
             # self.scalars = self.scalars[indexes]
             self.scalars = [self.scalars[i] for i in indexes]
             self.scalar_names = [self.scalar_names[i] for i in indexes]
-            self.params = [self.params[i] for i in indexes]       
+            self.params = [self.params[i] for i in indexes]   
+
+            #Activate save button
+            self.save_butt.state(["!disabled"])    
 
 
                
@@ -292,6 +310,40 @@ class TFReaderWin(tk.Tk):
             self.frame.scalars = self.scalars
             self.update_plot(self.get_smooth_value)
             self.update_scalar_labels()
+
+
+
+    #======================SAVE FUNCTIONS =====================================
+    #Saves currently plotted scalars to a .txt file
+    def save_scalar_data(self):
+
+        #Use datetime for filename
+        dt = datetime.datetime.now()     
+        dt_str = dt.strftime("%Y-%m-%d-%H-%M-%S")
+        filename = f"scalars-{dt_str}.txt"
+        filepath = os.path.join(self.root_dir, 'saved_scalars')
+
+        #If the dirs doesn't exist, create it
+        if not os.path.isdir(filepath):
+            os.mkdir(filepath)
+
+        if len(self.scalars) > 1:
+
+            with open(os.path.join(filepath, filename), 'w') as f:
+
+                #Write relevant infos
+                f.write("Scalars Plotted:\n")      
+                for i in range(len(self.scalars)):
+
+                    scalar_tag = re.sub(r'Ant-v4-', "",self.frame.scalar_name[i]).strip(':').strip('\n')
+                    name = self.scalar_names[i].split('\n')
+
+                    f.write(f'{name[0]}{name[1]}   Max Test Avg: {self.max_values[i]}   Scalar Tag: {scalar_tag}\n')
+
+
+            
+
+        
 
 
 
