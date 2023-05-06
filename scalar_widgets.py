@@ -85,8 +85,11 @@ class PlotContainer(ttk.Frame):
 
         #Gather correct values
         for i in range(len(self.scalars)):
- 
-            self.data.append(self.scalars[i][self.scalars[i]['tag'] == self.scalar_name[i]])
+            
+            data = self.scalars[i][self.scalars[i]['tag'] == self.scalar_name[i]]            
+            self.data.append(data)       
+
+
 
     #Updates the plot with the scalars data
     def update_plot(self, smooth_value):
@@ -102,30 +105,40 @@ class PlotContainer(ttk.Frame):
         self.line = []
         self.colors = []
 
+        
+
 
         for i in range(len(self.scalars)):
 
             #Gather plot data
             self.data_from_scalar()
-            x = self.data[i]['step']
-            y = self.smooth(self.data[i]['value'].values, smooth_value)
-            p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
-            
-            #Update plot limit values
-            if p < min_x:
-                min_x = p
-            if q > max_x:
-                max_x = q
-            if r < min_y:
-                min_y = r
-            if s > max_y:
-                max_y = s
+            if len(self.data[i]) > 0:
+                x = self.data[i]['step']
+                y = self.smooth(self.data[i]['value'].values, smooth_value)
+                p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
+                
+                #Update plot limit values
+                if p < min_x:
+                    min_x = p
+                if q > max_x:
+                    max_x = q
+                if r < min_y:
+                    min_y = r
+                if s > max_y:
+                    max_y = s
 
-           
-            #Draw line and store color
-            tmp, = self.ax.plot(x, y)
-            self.line.append(tmp)
-            self.colors.append(self.line[i].get_color())
+               
+                #Draw line and store color
+                tmp, = self.ax.plot(x, y)
+                self.line.append(tmp)
+                self.colors.append(self.line[i].get_color())
+
+            #The scalar has no valid data
+            else:
+
+                self.line.append(None)
+                self.colors.append(None)
+
 
         #Set plot limits and draw
         self.ax.set_xlim(min_x-10, max_x+10)

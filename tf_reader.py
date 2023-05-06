@@ -11,6 +11,7 @@ import numpy as np
 import tkinter as tk
 from tkinter import ttk
 
+
 #local imports
 from sessionloader import SessionLoader
 from scalar_widgets import ScrollableFrame, ScalarLabel, PlotContainer
@@ -221,24 +222,34 @@ class TFReaderWin(tk.Tk):
             self.scalar_labels = []
             self.scalar_buttons = []
         
+        #index used if some scalars does not have valid data
+        j = 0
+
         #If there are scalars, create labels and buttons
         if len(self.scalar_names) > 0:
             for i in range(len(self.scalar_names)):
 
-                #temporary string for the scalar tag
                 tmp_str = re.sub(r'Ant-v4-', "",self.frame.scalar_name[i]).strip(':')
-                #instantiate ScalarLabel class; uses fast update method instead of normal update
-                tmp = ScalarLabel(self.scalar_container.scrollable_frame, text = f'{self.scalar_names[i]}{tmp_str}', line = self.frame.line[i], update_fn = self.frame.fast_update)
-                tmp.grid(column = 0, row = i)
-                #create partial for instancing the Info window; for some reason lambda definition was not working
-                cmd = partial(self.info_win_bringup, self.params[i], self.scalar_names[i])
-                #instantiate Info Button                
-                tmp_butt = ttk.Button(self.scalar_container.scrollable_frame, text = "Info", width = 4, command = cmd)              
-                tmp_butt.grid(column = 1, row = i)
 
-                #update button and labels list
-                self.scalar_labels.append(tmp)
-                self.scalar_buttons.append(tmp_butt)
+                if self.frame.line[i] != None:
+                    #temporary string for the scalar tag
+                    tmp_str = re.sub(r'Ant-v4-', "",self.frame.scalar_name[i]).strip(':')
+                    #instantiate ScalarLabel class; uses fast update method instead of normal update
+                    tmp = ScalarLabel(self.scalar_container.scrollable_frame, text = f'{self.scalar_names[i]}{tmp_str}', line = self.frame.line[i], update_fn = self.frame.fast_update)
+                    tmp.grid(column = 0, row = j)
+                    #create partial for instancing the Info window; for some reason lambda definition was not working
+                    cmd = partial(self.info_win_bringup, self.params[i], self.scalar_names[i])
+                    #instantiate Info Button                
+                    tmp_butt = ttk.Button(self.scalar_container.scrollable_frame, text = "Info", width = 4, command = cmd)              
+                    tmp_butt.grid(column = 1, row = j)
+
+                    #update button and labels list
+                    self.scalar_labels.append(tmp)
+                    self.scalar_buttons.append(tmp_butt)
+                    j+=1
+
+
+
 
     #===================TOPLEVEL BRINGUP FUNCTIONS=========================
     #Bringup Select Scalar Window if there is no toplevel already
@@ -271,7 +282,7 @@ class TFReaderWin(tk.Tk):
                 self.frame.scalar_name.append(self.get_tag_choice)
 
 
-           
+        
        
 
         if len(self.scalars) > 1:
@@ -280,13 +291,23 @@ class TFReaderWin(tk.Tk):
             max_test_value = np.empty(0)
             for i in range(len(self.scalars)):
         
-                for tag in self.scalars[i]['tag']:
+                for j, tag in enumerate(self.scalars[i]['tag']):
 
                     if "Avg" in tag and "Network" in tag and "Test" in tag and not "Best" in tag:
 
                         x = self.scalars[i][self.scalars[i]['tag'].values == tag]
                         max_test_value = np.append(max_test_value, x['value'].values[-1])
                         break
+
+                    #Handles when the tag is not found
+                    #>could be caused by a training never finished
+                    else:
+                        
+                        if j == len(self.scalars[i]['tag']) - 1:                        
+
+                            max_test_value = np.append(max_test_value, -1000)
+
+            
 
 
             #Sort the array and get the indexes
@@ -327,9 +348,14 @@ class TFReaderWin(tk.Tk):
         if not os.path.isdir(filepath):
             os.mkdir(filepath)
 
+        #Save dialog window
+        file_path = tk.filedialog.asksaveasfilename(parent = self, initialdir = filepath, initialfile = filename, 
+                    filetypes=(("Text files", "*.txt"), ("All files", "*.*")), defaultextension = '.txt')
+      
+
         if len(self.scalars) > 1:
 
-            with open(os.path.join(filepath, filename), 'w') as f:
+            with open(file_path, 'w') as f:
 
                 #Write relevant infos
                 f.write("Scalars Plotted:\n")      

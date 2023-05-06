@@ -154,7 +154,8 @@ class SessionLoader:
 					if batch == 0 and hid == 0:
 
 						#Append [session, session_name]
-						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])                     
+						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])  
+		                  
            
 		return tmp
 
