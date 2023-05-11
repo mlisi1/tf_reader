@@ -26,6 +26,7 @@ The features implemented at the moment are the following:
   <img src="https://i.imgur.com/hKBDgYK.png" alt="Select Scalar" width="30%" height="30%">
 </div>
 
+
 ## Constraints
 ### Folder Structure
 
@@ -53,7 +54,7 @@ By being born from a Reainforcement Learning need, ```tf_reader``` is based on a
      |             └── ...
      └── ...
 ```
-Despite sounding complex, the directory tree used in this project is simply a fancy way of organizing different trainings. The first encountered folder contains the name of the environment (in this case, Gymnasium environments), model tags (such as MT1, indicating changes to the model like modifications to the number of layers), and reward tags (such as [RT1], indicating changes to the reward given to the agent).
+Despite sounding complex, the directory tree used in this project is simply a fancy way of organizing different trainings. The first encountered folder contains the name of the environment (in this case, <a href="https://gymnasium.farama.org/">Gymnasium</a> environments), model tags (such as MT1, indicating changes to the model like modifications to the number of layers), and reward tags (such as [RT1], indicating changes to the reward given to the agent).
 
 For each model and reward variation, there are multiple sessions, each containing model checkpoints, tf_events files (which can be uploaded to TensorBoard), and a defining .params file.
 
