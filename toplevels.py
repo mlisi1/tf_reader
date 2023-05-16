@@ -91,37 +91,34 @@ class SelectScalarWin(tk.Toplevel):
         tk.Toplevel.__init__(self)
         self.protocol('WM_DELETE_WINDOW', self.on_destroy)
         self.wm_title('Select Scalar')
-        self.geometry('250x300')
         self.resizable(tk.FALSE, tk.FALSE)
-        
+       
         #>All variables for the choice are handled in the caller to mantain persistency in different instances
-        #Network size option Menu and Label initialization
-        self.size_label = ttk.Label(self, text  = "Network Size:")
-        self.size_label.place(x = 10, y = 190)
-        self.size_option = ttk.OptionMenu(self, self.parent.size_choice, self.parent.size_choice.get(), *self.parent.sizes, command = self.choose_size)
-        self.size_option.place(x = 10, y = 210)
-
-        #Scalar Tag option Menu and Label
-        self.option_label = tk.Label(self, text = "Scalars Tag:")
-        self.option_label.place(x = 10, y = 130)
-        self.option_menu = ttk.OptionMenu(self, self.parent.tag_choice, self.parent.tag_choice.get(), *self.parent.tags)#, command = self.parent.update_plot)
-        self.option_menu.place(x = 10, y = 150)
-
         #Model Tag option Menu and Label
         self.model_option_label = tk.Label(self, text = "Model Tags:")
-        self.model_option_label.place(x = 10, y = 10)
-        self.model_options = ttk.OptionMenu(self, self.parent.model_choice, self.parent.model_choice.get(), *self.parent.available_models)#, command = self.parent.update_scalars)
-        self.model_options.place(x = 10, y = 30)
+        self.model_option_label.grid(row = 0, column = 0, sticky = "NW", padx = 10, pady = 3)
+        self.model_options = ttk.OptionMenu(self, self.parent.model_choice, self.parent.model_choice.get(), *self.parent.available_models)
+        self.model_options.config(width = 23)
+        self.model_options.grid(row = 1, column = 0, sticky = "NW", padx = 10, pady = 3)
 
         #Reward Tag option Menu and Label
         self.reward_option_label = tk.Label(self, text = "Reward Tags:")
-        self.reward_option_label.place(x = 10, y = 70)
-        self.reward_options = ttk.OptionMenu(self, self.parent.reward_choice, self.parent.reward_choice.get(), *self.parent.available_rewards)#, command = self.parent.update_scalars)
-        self.reward_options.place(x = 10, y = 90)        
+        self.reward_option_label.grid(row = 2, column = 0, sticky = "NW", padx = 10, pady = 3)
+        self.reward_options = ttk.OptionMenu(self, self.parent.reward_choice, self.parent.reward_choice.get(), *self.parent.available_rewards)
+        self.reward_options.config(width = 23)
+        self.reward_options.grid(row = 3, column = 0, sticky = "NW", padx = 10, pady = 3)   
+        
+        #Network size option Menu and Label initialization
+        self.size_label = ttk.Label(self, text  = "Network Size:")
+        self.size_label.grid(row = 4, column = 0, sticky = "NW", padx = 10, pady = 3)
+        self.size_option = ttk.OptionMenu(self, self.parent.size_choice, self.parent.size_choice.get(), *self.parent.sizes, command = self.choose_size)
+        self.size_option.grid(row = 5, column = 0, sticky = "NW", padx = 10, pady = 3)
+        self.size_option.config(width = 23)
 
         #Select Button
         self.select_butt = ttk.Button(self, text = "Select", command = self.select_scalar)
         self.select_butt.place(x = 80, y = 260)
+        self.select_butt.grid(row = 6, column = 0, sticky = "NWES", padx = 70, pady = (30, 10))
 
     #Method called on window destroy
     def on_destroy(self):

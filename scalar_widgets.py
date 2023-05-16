@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 
 import numpy as np
+import os
 
 #Matplotlib plot utilities and tk wrapper
 import matplotlib.pyplot as plt
@@ -15,37 +16,91 @@ except ImportError:
     from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as NavigationToolbar2TkAgg
 
 
+#================ TOOLBAR ===================
+# A custom class for NavigationToolbar2TkAgg; 
+# Adds the possibility to be resized to a smaller version with smaller icons
+class Toolbar(NavigationToolbar2TkAgg):
+
+    def __init__(self, plot, master, pack_toolbar = True, default = True):
+
+        #Initialize super class
+        super().__init__(plot, master, pack_toolbar = pack_toolbar)
+        
+        #Toolbar small icons paths
+        self.icon_names = ['./icons/home.gif', './icons/left_arrow.gif', './icons/right_arrow.gif', './icons/move.gif', './icons/zoom.gif',
+                            './icons/config.gif', './icons/save.gif']
+
+        #Default icons and size
+        self.default_icons = [widget.cget('image') for widget in self.winfo_children() if isinstance(widget, (tk.Button, tk.Checkbutton))]
+        self.default_hw = (self.winfo_children()[0].cget('height'), self.winfo_children()[0].cget('width'))
+
+        self.icons = []
+
+        #The coordinates label is removed and placed elsewhere
+        self._message_label.pack_forget()
+        self._load_icons()      
+
+    #Loads the small icons
+    def _load_icons(self):
+
+        for i, icon in enumerate(self.icon_names):
+            self.icons.append(tk.PhotoImage(file = icon))
+
+    #Changes the toolbar to its smaller version
+    def change_icons(self, default):
+
+        #Delete all existing buttons
+        self.place_forget()
+        i = 0
+        for widget in self.winfo_children():            
+
+            if isinstance(widget, (tk.Button, tk.Checkbutton)):               
+
+                #Create new buttons and checkbuttons according to the requested size
+                widget.config(height = self.default_hw[0] if default else 17, 
+                                image = self.default_icons[i] if default else self.icons[i], 
+                                width = self.default_hw[1] if default else 17)
+
+                if isinstance(widget, tk.Checkbutton):
+                    widget.config(selectimage = self.default_icons[i] if default else self.icons[i])
+                i+=1
+
+        self.place(height = 50 if default else 30)
 
 
 #=============== PLOT CONTAINER ====================
 #Frame used to contain Matplotlibs tk wrapper; handles low level plot functions
 class PlotContainer(ttk.Frame):
 
-    def __init__(self, container, scalars, scalar_choice):
+    def __init__(self, container, scalars, scalar_choice, **args):
 
         #Initialize frame and figure
-        tk.Frame.__init__(self, container)
+        tk.Frame.__init__(self, container, **args)
         self.fig, self.ax = plt.subplots()  
-        self.ax.grid()       
+        self.ax.grid(True)   
 
         #Initialize Matplotlib wrappers and place them
         self.canvas = FigureCanvasTkAgg(self.fig, master = self)
         self.canvas.draw()
-        self.canvas.get_tk_widget().pack(side=tk.BOTTOM)
- 
-        self.toolbar = NavigationToolbar2TkAgg(self.canvas, self)
-        self.toolbar.update()
+        self.canvas.get_tk_widget().pack(side=tk.BOTTOM)       
         self.canvas._tkcanvas.pack(side=tk.TOP, expand =True)
+        self.title = ""       
+
+        self.tool_frame = tk.Frame(self)
+        self.toolbar = Toolbar(self.canvas, self.tool_frame)
+        self.toolbar.update()
+        self.tool_frame.pack(fill = tk.X)
+        self.coord = self.toolbar.message
 
         #Initialize scalar defining arrays
         self.scalars = scalars
-        self.scalar_name = [scalar_choice]
+        self.scalar_name = scalar_choice
         self.line = []
         self.colors = []
         self.data = []  
 
         #Translate scalars to arrays
-        self.data_from_scalar()    
+        self.data_from_scalar() 
 
 
     #Smooth function; implemented after the analog Tensorboard feature
@@ -72,7 +127,6 @@ class PlotContainer(ttk.Frame):
 
         #Reset scalar choices arrays
         self.scalars = []
-        self.scalar_name = []
         self.colors = []
 
     #Gets data from scalars
@@ -85,8 +139,8 @@ class PlotContainer(ttk.Frame):
 
         #Gather correct values
         for i in range(len(self.scalars)):
-            
-            data = self.scalars[i][self.scalars[i]['tag'] == self.scalar_name[i]]            
+             
+            data = self.scalars[i][self.scalars[i]['tag'] == self.scalar_name]   
             self.data.append(data)       
 
 
@@ -103,9 +157,7 @@ class PlotContainer(ttk.Frame):
         #Clear plot and reset plot relative arrays
         self.ax.clear()
         self.line = []
-        self.colors = []
-
-        
+        self.colors = []       
 
 
         for i in range(len(self.scalars)):
@@ -139,10 +191,12 @@ class PlotContainer(ttk.Frame):
                 self.line.append(None)
                 self.colors.append(None)
 
-
-        #Set plot limits and draw
+        
+        #Set plot limits, title and grid and draw
         self.ax.set_xlim(min_x-10, max_x+10)
-        self.ax.set_ylim(min_y-10, max_y+50)        
+        self.ax.set_ylim(min_y-10, max_y+50)   
+        self.ax.grid(True) 
+        self.ax.set_title(self.title)    
         self.canvas.draw()
 
     #Fast update method; it only redraws the plot;
@@ -150,17 +204,6 @@ class PlotContainer(ttk.Frame):
     def fast_update(self):
 
         self.canvas.draw()
-
-    #NOT YET IMPLEMENTED
-    @property
-    def max_scalar(self):
-
-        for i in range(len(self.scalars)):
-            x = self.data[i]['step']
-            y = self.smooth(self.data[i]['value'].values, smooth_value)
-
-    
-
 
 
 #===================== SCROLLABLE FRAME ===============
@@ -173,26 +216,26 @@ class ScrollableFrame(ttk.Frame):
         super().__init__(container, *args, **kwargs)
 
         #Initialize canvas and scrollbar, both attached to the frame
-        canvas = tk.Canvas(self, height = height, width = width)
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        self.canvas = tk.Canvas(self, height = height, width = width)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
 
         #Scrollable frame where widgets will be attached
-        self.scrollable_frame = ttk.Frame(canvas)
+        self.scrollable_frame = ttk.Frame(self.canvas)
         self.scrollable_frame.columnconfigure(row)
         self.scrollable_frame.rowconfigure(column)
 
         #Configure scrollbar and scrollbar frame
         self.scrollable_frame.bind(
             "<Configure>",
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox("all")
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
             )
         )
-        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
 
         #Place items
-        canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
 
@@ -200,44 +243,265 @@ class ScrollableFrame(ttk.Frame):
 #Conveniently defined labels with hover methods
 class ScalarLabel(ttk.Label):
 
-    def __init__(self, container, text, line, update_fn):
+    def __init__(self, container, text, lines, update_fns):
 
         #Initialize label
         super().__init__(container, text = text)
 
         #Get line and line color
-        self.line = line
-        self.color = line.get_color()
+        self.lines = lines
+        if self.lines is not None:
+            self.color = lines[0].get_color()
+        else:
+            self.color = "#000000"
 
         #Assign the color to the label
         self.configure(foreground = self.color)
         
         #Reference to the update function (fast update)
-        self.update_fn = update_fn
+        self.update_fns = update_fns
 
         # Bind the hover functions to the <Enter> and <Leave> events
         self.bind("<Enter>", self.on_enter)       
         self.bind("<Leave>", self.on_leave)
 
     #Method called externally; updates the assigned line if plot has changed
-    def update_line(self, line):
+    def update_lines(self, lines, update_fns):
 
-        self.line = line
+        
+        self.lines = lines
+        self.update_fns = update_fns
+        if self.lines != None:
+            self.configure(foreground = self.lines[0].get_color())
+        else:
+            self.configure(foreground = "#000000")
 
     #Hover functions
     def on_enter(self, event):
 
         #Highlight label and assigned line
-        self.configure(foreground="black")
-        self.line.set_linewidth(3)
-        self.update_fn()
+        if self.lines != None:
+            self.configure(foreground="black")
+            for i, line in enumerate(self.lines):
+                self.lines[i].set_linewidth(3)
+                self.update_fns[i]()
 
     def on_leave(self, event):
 
         #Deselect label and line
-        self.configure(foreground=self.color)
-        self.line.set_linewidth(1)
-        self.update_fn()
+        if self.lines != None:
+            self.configure(foreground=self.color)
+            for i, line in enumerate(self.lines):
+                self.lines[i].set_linewidth(1)
+                self.update_fns[i]()
+
+
+
+
+#====================PLOT HANDLER====================
+#Class capable of handling multiple instances of PlotContainer
+#Chooses from the loaded scalars the correct tags
+#Allows to create up to 6 plots
+class PlotHandler(ttk.Frame):
+
+    def __init__(self, container, tags, full_tags, **args):
+
+        super().__init__(container, **args)
+
+        self.icon = tk.PhotoImage(file = './icons/minus.gif')
+
+        self.scalars = []
+
+        self.scalar_tags = tags
+        self.full_scalar_tags = full_tags 
+
+        self.scalar_choice = tk.StringVar()
+        self.scalar_choice.set(self.scalar_tags[0])
+
+        self.root_size = None
+        self.offset = (300, 220)
+        
+
+ 
+        #Top frame used for the scalar tag choice and to add plots
+        self.top_frame = ttk.Frame(self, height = 30)
+        self.top_frame.grid(row = 0, column = 1, sticky = "NW", pady = 5, columnspan = 3)
+
+        self.option_menu  = ttk.OptionMenu(self.top_frame, self.scalar_choice, self.scalar_tags[0], *self.scalar_tags)
+        self.option_menu.config(width = 25)
+        self.option_menu.grid(row = 0, column = 0, sticky  = "NW", padx = 20, pady = 5)
+
+        self.add_butt = ttk.Button(self.top_frame, text = "Add", command = self.add_plot)
+        self.add_butt.grid(row = 0, column = 1, padx = 10, pady = 5, sticky = "NE")
+
+
+        #Fixed grid positions for the plots
+        self.positions = [(1,1), (2,1), (1,2), (2,2), (1,3), (2,3)]       
+
+     
+        self.frames = []
+        self.plots = []
+        self.labels = []
+        self.remove_buttons = []
+
+        #Variable used to trigger root update
+        self.need_to_update = False        
+
+     
+    #Gets the correct plot sizes based on the window size
+    @property
+    def plot_size(self):
+
+        if len(self.plots) == 1:
+
+            height = self.root_size[1]-self.offset[1]
+            width = self.root_size[0]-self.offset[0]
+            return (width, height)
+
+        if len(self.plots) == 2:
+
+            height = self.root_size[1]-self.offset[1]
+            width = self.root_size[0]-self.offset[0]
+            height = height/2
+            return (width, height)
+
+        if len(self.plots) > 2 and len(self.plots) < 5:
+
+            height = self.root_size[1]-self.offset[1]
+            width = self.root_size[0]-self.offset[0]
+            height = height/2
+            width = width/2
+            return (width, height)
+
+        if len(self.plots) > 4:
+
+            height = self.root_size[1]-self.offset[1]
+            width = self.root_size[0]-self.offset[0]-20
+            height = height/2
+            width = width/3
+            return (width, height)
+
+
+    #Calls the update function for every plot
+    def update_plots(self, smooth_value):
+
+        for plot in self.plots:
+
+            plot.scalars = self.scalars
+            plot.update_plot(smooth_value)
+
+    #Returns the full tag 
+    @property
+    def get_tag_choice(self):
+        key = self.scalar_choice.get()
+        index = self.scalar_tags.index(key)       
+        return self.full_scalar_tags[index]  
+
+    #Add a plot
+    def add_plot(self):
+
+        #Initialize frame (container), plot, remove button, and coordinates label and place them in the frame
+        new_frame = ttk.Frame(self)
+
+        new_plot = PlotContainer(new_frame, self.scalars, self.get_tag_choice)
+        new_plot.title = self.scalar_choice.get()
+        new_plot.grid(row = 0, column = 0)
+
+        new_button = tk.Button(new_frame, text = "-", image = self.icon, height = 17, width = 17, command = lambda: self.remove_plot(new_plot))
+        new_button.grid(row = 1, column = 0, sticky = "NE", padx = 10)       
+
+        new_label = tk.Label(new_frame, textvariable = new_plot.coord, justify=tk.RIGHT)
+        new_label.grid(row = 1, column = 0, sticky = "NW", padx = 20)        
+
+        self.frames.append(new_frame)
+        self.plots.append(new_plot)
+        self.labels.append(new_label)
+
+        #Update
+        self.update_sizes()
+        self.update_grid()
+        self.update_plots(0.0)
+        self.need_to_update = True
+
+        #Max plot number is 6
+        if len(self.plots) == 6:
+
+            self.add_butt.state(["disabled"])
+
+
+    #Update the plots to the correct sizes along with dpi and toolbar
+    def update_sizes(self):
+
+
+        for i, plot in enumerate(self.plots):
+            plot.canvas.get_tk_widget().config(width=self.plot_size[0], height=self.plot_size[1])
+
+            if len(self.plots) <=2:
+                plot.fig.dpi = 100
+                plot.toolbar.change_icons(True)
+                plot.tool_frame.config(height = 50)
+
+            else:
+                plot.fig.dpi = 75
+                plot.toolbar.change_icons(False)
+                plot.tool_frame.config(height = 30)
+
+
+    #Place the plots according to the fixes positions
+    def update_grid(self):
+
+        for i, frame in enumerate(self.frames):
+
+            frame.grid_remove()
+            frame.grid(row = self.positions[i][0], column = self.positions[i][1], sticky="NW", padx = 5, pady = 5)
+        
+            self.labels[i].grid_remove()
+            self.labels[i].grid(row = 1, column = 0, sticky = "NW", padx = 20)
+
+
+
+    #Remove plots
+    def remove_plot(self, rm_plot):
+
+
+        for i, plot in enumerate(self.plots):
+
+            if plot == rm_plot:
+
+                self.plots[i].destroy()
+                self.labels[i].destroy()
+                self.frames[i].destroy()
+                self.plots.pop(i)
+                self.labels.pop(i)
+                self.frames.pop(i)
+                break
+
+        self.update_sizes()
+        self.update_grid()
+        self.need_to_update = True
+        self.add_butt.state(["!disabled"])
+
+    #Calls the clear function for every plot
+    def clear(self):
+        
+        del self.scalars
+        self.scalars = []
+
+        for plot in self.plots:
+            plot.clear()
+
+    #Resize function; adjusts plot size according to the window size
+    def on_resize(self, win_size):
+
+        self.update()        
+        self.root_size = win_size       
+
+        for plot in self.plots:
+            
+            plot.canvas.get_tk_widget().config(width = self.plot_size[0], height = self.plot_size[1])
+
+
+
 
 
 

@@ -53,6 +53,7 @@ class SessionLoader:
 		self.reward_tags = []
 		self.sessions = []
 		self.model_dict = {}
+		self.main_dir = os.getcwd()
 
 	#Updates model tags dict assigning every folder to its model tag combination
 	def update_tags_dict(self, folder_name,):       
@@ -69,9 +70,9 @@ class SessionLoader:
 		    #Create entry if new; else append to existing values
 		    if model_tags in self.model_dict:
 		  
-		        self.model_dict[model_tags].append(folder_name)
+		        self.model_dict[model_tags].append(glob.glob(glob.escape(folder_name))[0])
 		    else:
-		        self.model_dict[model_tags] = [folder_name]
+		        self.model_dict[model_tags] = [glob.glob(glob.escape(folder_name))[0]]
 
 	#Retrives correct session folder after model and reward tags
 	def retrieve_folder(self, model, reward):
@@ -126,16 +127,17 @@ class SessionLoader:
 		return string
 
 	#Scalar retrieval function; checks all the selected tags
-	def get_scalar_from_tags(self, model, reward, batch = 0, hid = 0):      
+	def get_scalar_from_tags(self, model, reward, batch = 0, hid = 0, pool = None):      
 
-
+		os.chdir(self.trainings_dir)
 		tmp = []
 
 		#Find only relevant session folders
 		selected_folder_iterator = self.retrieve_folder(model, reward)
 
 		#Initialize pool
-		pool = Pool(processes = 10)
+		if pool is None:
+			pool = Pool(processes = 10)
 
 		for folder in selected_folder_iterator:
 
@@ -155,6 +157,8 @@ class SessionLoader:
 
 						#Append [session, session_name]
 						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])  
+
+		os.chdir(self.main_dir)
 		                  
            
 		return tmp
@@ -168,7 +172,7 @@ class SessionLoader:
 		self.model_tags = []
 		self.reward_tags = []
 
-        #Go to trainings dir
+        #Go to trainings dir		
 		os.chdir(self.trainings_dir)
 
 		for directory in glob.glob('*'):
@@ -176,7 +180,6 @@ class SessionLoader:
             #Exclude every dir ending in .something
 			if exclude_faults and '.' in directory:
 				continue
-
 
 			self.update_tags_dict(directory)
 			#Split dir name string
@@ -210,12 +213,13 @@ class SessionLoader:
 				temp.params = self.read_dataclass_file(params_path, TrainingParameters)
 
 				#Retrieve tf_events file path
-				tf_events_path = glob.glob(glob.escape(f"{model}")+"/*/*/events*")[0]           
+				tf_events_path = glob.glob(glob.escape(f"{model}")+"/*/*/events*")[0]         
 				temp.tf_events_path = tf_events_path
 
 
 				self.sessions.append(temp)
 
+		os.chdir(self.main_dir)
 
 	#Dataclass parsing function; used to read training dataclass file
 	def read_dataclass_file(self, filename: str, dataclass_type: Type = TrainingParameters) -> List:

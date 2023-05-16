@@ -26,6 +26,10 @@ class TrainingParameters:
     hidden_size: int = 256
     sample_size: int = 10
 
+
+    bias: bool = True
+    nohid: bool = False
+
     epsilon: float = 0.9  # Hyperparameter used in epsilon-greedy algorithms (and others)
     epsilon_decay: float = 0.99
     epsilon_min: float = 0.0

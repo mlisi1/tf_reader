@@ -5,17 +5,15 @@ from functools import partial
 import datetime
 import numpy as np
 
-
-
 #GUI
 import tkinter as tk
 from tkinter import ttk
 
-
 #local imports
 from sessionloader import SessionLoader
-from scalar_widgets import ScrollableFrame, ScalarLabel, PlotContainer
+from scalar_widgets import ScrollableFrame, ScalarLabel, PlotHandler
 from toplevels import InfoWindow, SelectScalarWin
+
 
 
 
@@ -30,28 +28,22 @@ class TFReaderWin(tk.Tk):
         tk.Tk.wm_title(self, "TF Reader")
         self.tk.call("source", "azure.tcl")
         self.tk.call("set_theme", "light")
-        self.geometry("920x520")
-        self.resizable(tk.FALSE, tk.FALSE)
+        self.geometry("950x650")
         self.protocol('WM_DELETE_WINDOW', self.on_destroy)
-        self.grid_rowconfigure(10, weight=1)
-        self.grid_columnconfigure(20, weight=1)
+        self.grid_rowconfigure(0, weight=20)
+        self.grid_columnconfigure(0, weight = 30)
 
         self.root_dir = os.getcwd()
 
-        #Plot container initialization
-        self.container = ttk.Frame(self)
-        self.container.grid(row = 0, rowspan = 10, column = 0, columnspan = 10)
-        self.container.grid_rowconfigure(0, weight=10)
-        self.container.grid_columnconfigure(0, weight=10)   
-        
+
         #Scalar list frame initialization
-        self.scalar_container = ScrollableFrame(self, 20, 2, width = 260, height = 300)
-        self.scalar_container.grid(row = 6, column = 20) 
+        self.scalar_container = ScrollableFrame(self, 20, 2, width = 270, height = 400)
+        self.scalar_container.grid(row = 0, column = 2, sticky = "E", pady = (100, 20), padx = (0, 10))         
 
-
+        #Save button
         self.save_butt = ttk.Button(self, text = "Save scalar data", command = self.save_scalar_data)
         self.save_butt.state(["disabled"])
-        self.save_butt.place(x = 700, y = 460)
+        self.save_butt.grid(row = 0, column = 2, pady = 30, sticky = "SE", padx = 40)
 
         #Array of scalars and their relative parameters
         self.scalars = []
@@ -88,17 +80,18 @@ class TFReaderWin(tk.Tk):
 
         #Button to add scalars initialization
         self.add_scalar_button = ttk.Button(self, text = "Add Scalar", command = self.add_scalar_fn)
-        self.add_scalar_button.place(x = 655, y = 90)
+        self.add_scalar_button.grid(row = 0, column = 2, sticky = "NE", pady = 100, padx = (0,180))
 
         #Button to clear the plot
         self.clear_button = ttk.Button(self, text = "Clear", command = self.clear)
-        self.clear_button.place(x = 775, y = 90)
+        self.clear_button.grid(row = 0, column = 2, sticky = "NE", pady = 100, padx = (0,50))
 
         #Toplevel variable; used to only allow one additional window at a time
         self.toplevel = None
         
         #calls the SessionLoader to attempt a first load for initialization purposes
         self.frame = None
+        self.plot_container = None
         self.append_scalar()            
 
         #Model tag choice variables initialization
@@ -106,31 +99,32 @@ class TFReaderWin(tk.Tk):
         self.full_tags = []
         self.get_tags()
         assert len(self.tags) == len(self.full_tags)
-        self.tag_choice = tk.StringVar()
-        self.tag_choice.set(self.tags[0])
+
+        #Plot Handler class; hadles plot adding, removing and rescaling
+        self.plot_container = PlotHandler(self, self.tags, self.full_tags)
+        self.plot_container.grid(row = 0, column = 0, sticky = "NW")        
 
         #Smooth variable and slider initialization
         self.smooth_value = tk.DoubleVar()
         self.smooth_value_label = ttk.Label(self, text = str(self.get_smooth_value))
-        self.smooth_value_label.place(x = 750, y = 20)
+        self.smooth_value_label.grid(row = 0, column = 2, sticky = "NE", pady = 20, padx = (0,170))
         self.slider_label = ttk.Label(self, text = "Smooth Value:")
-        self.slider_label.place(x = 650, y = 20)
+        self.slider_label.grid(row = 0, column = 2, sticky = "NE", pady = 20, padx = (0,200))
         self.slider = ttk.Scale(self, from_ = 0.0, to = 0.99, variable = self.smooth_value,
                         orient = tk.HORIZONTAL, command = self.update_plot, length = 200)
-        self.slider.place(x = 660, y = 50)
+        self.slider.grid(row = 0, column = 2, sticky = "NE", pady = 60, padx = (0,70))
 
-        #Initialize plot frame, generate and clear plot       
-        self.initialize_plot_frame()
-        self.clear()
+        #Bind resizing function
+        self.bind("<Configure>", self.on_resize) 
+        self.previous_size = (950, 650)
 
-    #======GETTER AND SETTERS===========
-    #Returns the full tag after the chosen tag shown in GUI
-    @property
-    def get_tag_choice(self):
-        key = self.tag_choice.get()
-        index = self.tags.index(key)       
-        return self.full_tags[index]    
+        #Attempt a first resize to inizialize some values      
+        self.on_resize(None)
+        self.clear()    
 
+
+
+    #======GETTER AND SETTERS=========== 
     #Retrieves the set of tags found in the scalar
     ##At the moment it is used only for initialization purposes; the tags cannot be updated at a second moment
     def get_tags(self):
@@ -164,9 +158,26 @@ class TFReaderWin(tk.Tk):
 
     #Just a convenient gruping for tkinter update functions; to be used instead of mainloop()
     def update_gui(self):
-
+        if self.plot_container is not None:
+            if self.plot_container.need_to_update:
+                self.update_plot(self.get_smooth_value)
+                self.plot_container.need_to_update = False
         self.update_idletasks()
         self.update()
+
+    #Calls the PlotHandler resize function and resizes Scrollable Frame
+    def on_resize(self, event):
+
+        #Update to get the current values
+        self.update()
+        curr_size = (self.winfo_width(), self.winfo_height())
+
+        if self.previous_size != curr_size:
+
+            self.plot_container.on_resize(curr_size)
+            self.scalar_container.canvas.config(height = curr_size[1]-250)
+
+        self.previous_size = curr_size
 
     #==============PLOT HIGH LEVEL FUNCTIONS===============
     #Clears the plot, scalar labels and resets attributes
@@ -186,17 +197,11 @@ class TFReaderWin(tk.Tk):
         self.save_butt.state(["disabled"])
 
         #The low level clear function
-        self.frame.clear()
+        self.plot_container.clear()
 
         #Clear the scalar labels
         self.update_scalar_labels()
 
-    #Initialize plot frame with PlotContainer class
-    def initialize_plot_frame(self):
-
-        self.frame = PlotContainer(self.container, self.scalars, self.get_tag_choice)
-        self.frame.grid(row=0, column=0, sticky="nsew")
-        self.frame.tkraise()
 
     #Standard plot update method: redraws the plot and updates existing scalar label's line variable
     def update_plot(self, smooth_value):
@@ -204,11 +209,21 @@ class TFReaderWin(tk.Tk):
         #Update smooth value label
         self.smooth_value_label.config(text = f'{self.get_smooth_value:.2f}')
 
-        self.frame.update_plot(self.get_smooth_value)
-
+        #Update plots
+        self.plot_container.update_plots(self.get_smooth_value)        
+        
+        #Update scalar labels lines   
         for i in range(len(self.scalar_labels)):
+            if len(self.plot_container.plots) > 0:
+                lines = [plot.line[i] for plot in self.plot_container.plots]
+                updates = [plot.fast_update for plot in self.plot_container.plots]
 
-            self.scalar_labels[i].update_line(self.frame.line[i])
+            else:
+
+                lines = None
+                updates = None
+
+            self.scalar_labels[i].update_lines(lines, updates)
 
     #================GUI ELEMENT UPDATE FUNCTIONS================================
     #Updates the labes by destroying and recreating according to the scalars
@@ -229,24 +244,32 @@ class TFReaderWin(tk.Tk):
         if len(self.scalar_names) > 0:
             for i in range(len(self.scalar_names)):
 
-                tmp_str = re.sub(r'Ant-v4-', "",self.frame.scalar_name[i]).strip(':')
+                #Gather lines and correct update functions
+                if len(self.plot_container.plots) > 0:
+                    lines = [plot.line[i] for plot in self.plot_container.plots]
+                    updates = [plot.fast_update for plot in self.plot_container.plots]
 
-                if self.frame.line[i] != None:
-                    #temporary string for the scalar tag
-                    tmp_str = re.sub(r'Ant-v4-', "",self.frame.scalar_name[i]).strip(':')
-                    #instantiate ScalarLabel class; uses fast update method instead of normal update
-                    tmp = ScalarLabel(self.scalar_container.scrollable_frame, text = f'{self.scalar_names[i]}{tmp_str}', line = self.frame.line[i], update_fn = self.frame.fast_update)
-                    tmp.grid(column = 0, row = j)
-                    #create partial for instancing the Info window; for some reason lambda definition was not working
-                    cmd = partial(self.info_win_bringup, self.params[i], self.scalar_names[i])
-                    #instantiate Info Button                
-                    tmp_butt = ttk.Button(self.scalar_container.scrollable_frame, text = "Info", width = 4, command = cmd)              
-                    tmp_butt.grid(column = 1, row = j)
+                else:
 
-                    #update button and labels list
-                    self.scalar_labels.append(tmp)
-                    self.scalar_buttons.append(tmp_butt)
-                    j+=1
+                    lines = None
+                    updates = None
+
+ 
+                #instantiate ScalarLabel class; uses fast update method instead of normal update
+                tmp = ScalarLabel(self.scalar_container.scrollable_frame, text = f'{self.scalar_names[i]}', lines = lines, update_fns = updates)
+                tmp.grid(column = 0, row = j, sticky = "NW")
+
+                #create partial for instancing the Info window; for some reason lambda definition was not working
+                cmd = partial(self.info_win_bringup, self.params[i], self.scalar_names[i])
+
+                #instantiate Info Button                
+                tmp_butt = ttk.Button(self.scalar_container.scrollable_frame, text = "Info", width = 4, command = cmd)              
+                tmp_butt.grid(column = 1, row = j)
+
+                #update button and labels list
+                self.scalar_labels.append(tmp)
+                self.scalar_buttons.append(tmp_butt)
+                j+=1
 
 
 
@@ -276,14 +299,7 @@ class TFReaderWin(tk.Tk):
             
             self.scalars.append(tmp[0])
             self.scalar_names.append(tmp[1])
-            self.params.append(tmp[2])
-
-            if self.frame is not None:
-                self.frame.scalar_name.append(self.get_tag_choice)
-
-
-        
-       
+            self.params.append(tmp[2])       
 
         if len(self.scalars) > 1:
             
@@ -306,7 +322,6 @@ class TFReaderWin(tk.Tk):
                         if j == len(self.scalars[i]['tag']) - 1:                        
 
                             max_test_value = np.append(max_test_value, -1000)
-
             
 
 
@@ -314,23 +329,21 @@ class TFReaderWin(tk.Tk):
             indexes = np.argsort(max_test_value)[::-1] 
             self.max_values = np.sort(max_test_value)[::-1]
                  
-            # self.scalars = self.scalars[indexes]
             self.scalars = [self.scalars[i] for i in indexes]
             self.scalar_names = [self.scalar_names[i] for i in indexes]
             self.params = [self.params[i] for i in indexes]   
 
             #Activate save button
-            self.save_butt.state(["!disabled"])    
-
-
-               
+            self.save_butt.state(["!disabled"])                   
 
 
         #Update plot
-        if self.frame is not None:
-            self.frame.scalars = self.scalars
+        if self.plot_container is not None:
+
+            self.plot_container.scalars = self.scalars
             self.update_plot(self.get_smooth_value)
             self.update_scalar_labels()
+
 
 
 
