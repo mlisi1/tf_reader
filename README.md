@@ -11,20 +11,28 @@ Currently, the app only supports plotting Scalars, but more features will be add
 
 ## Features
 The features implemented at the moment are the following:
-+ Automatic training folder scan
-+ Identifies training sessions by model tags, reward tags and size
++ Automatic training session retrieval:
+     + Predefined folder structure to allow automatic search
+     + Training sessions are identified by model tags, reward tags and size
      + Further selection based on the Scalar Tag
-+ Curves on the plot can be smoothed via slider
-+ Training specific dataclass is read and showed in a scalar-specific Info window
-+ Scalar is highlited in the plot when the mouse hovers its label
-+ Scalars are ordered based on how well they performed on average during test
-+ A list of the scalars plotted can now be saved in a .txt file
++ Multiple plots:
+     + The window can now be rescaled, allowing for bigger plots 
+     + Curves on the plot can be smoothed via slider, similar to TensorBoard
+     + Full capabilities of the `matplotlib` plot toolbar
+     + Now multiple plots (up to 6) corresponding to different scalar tags can be displayed
++ Each scalar plotted is being kept track:
+     + Plotted scalars are displayed along with its model and reward tag, and size
+     + The labels are ordered based on how well the model performed on average during testing
+     + Hovering the name will highlight each plotted line
+     + Info window can be opened to view the training session hyperparameters 
++ An ordered list of the plotted scalars can be saved to a .txt file 
 
 
 <div style="display: flex;">
-  <img src="https://i.imgur.com/65mwcBy.png" alt="Main Win" width="60%" height="60%">
-  <img src="https://i.imgur.com/hKBDgYK.png" alt="Select Scalar" width="30%" height="30%">
+  <img src="https://i.imgur.com/BzEZfQ2.png" alt="Main Win" width="60%" height="60%">
+  <img src="https://i.imgur.com/ffz8cZO.png" alt="Select Scalar" width="30%" height="30%">  
 </div>
+<img src="https://i.imgur.com/IobV4nP.png" alt="Multiple Plots" width="70%" height="70%">
 
 
 ## Constraints
