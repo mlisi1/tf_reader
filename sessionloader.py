@@ -51,9 +51,23 @@ class SessionLoader:
 		self.trainings_dir = trainings_dir
 		self.model_tags = []
 		self.reward_tags = []
+		self.size_tags = []
 		self.sessions = []
 		self.model_dict = {}
 		self.main_dir = os.getcwd()
+
+	#Retrieves all the combinations of 'hidden_size, batch_size' from the params dataclass
+	def get_size_tags(self):
+
+		for session in self.sessions:
+
+			batch = session.params[0].batch_size
+			hidden = session.params[0].hidden_size
+			size_str = f"{hidden},{batch}"
+			if size_str in self.size_tags:
+				pass
+			else:
+				self.size_tags.append(size_str)
 
 	#Updates model tags dict assigning every folder to its model tag combination
 	def update_tags_dict(self, folder_name,):       
@@ -220,6 +234,7 @@ class SessionLoader:
 				self.sessions.append(temp)
 
 		os.chdir(self.main_dir)
+		self.get_size_tags()
 
 	#Dataclass parsing function; used to read training dataclass file
 	def read_dataclass_file(self, filename: str, dataclass_type: Type = TrainingParameters) -> List:

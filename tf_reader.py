@@ -43,7 +43,7 @@ class TFReaderWin(tk.Tk):
         #Save button
         self.save_butt = ttk.Button(self, text = "Save scalar data", command = self.save_scalar_data)
         self.save_butt.state(["disabled"])
-        self.save_butt.grid(row = 0, column = 2, pady = 30, sticky = "SE", padx = 40)
+        self.save_butt.grid(row = 0, column = 2, pady = 30, sticky = "SE", padx = (20, 20))
 
         #Array of scalars and their relative parameters
         self.scalars = []
@@ -61,7 +61,8 @@ class TFReaderWin(tk.Tk):
         self.model_choice.set(self.available_models[0])
 
         #Size choice variables
-        self.sizes = ["256,32", "256,64", "512,64", "512,128", "All"]
+        self.sizes = self.loader.size_tags #["256,32", "256,64", "512,64", "512,128", "All"]
+        self.sizes.append("All")
         self.size_choice = tk.StringVar()
         self.size_choice.set(self.sizes[0])
         self.chosen_batch = 32
@@ -102,7 +103,11 @@ class TFReaderWin(tk.Tk):
 
         #Plot Handler class; hadles plot adding, removing and rescaling
         self.plot_container = PlotHandler(self, self.tags, self.full_tags)
-        self.plot_container.grid(row = 0, column = 0, sticky = "NW")        
+        self.plot_container.grid(row = 0, column = 0, sticky = "NW") 
+
+
+        self.save_plots_button = ttk.Button(self, text = "Save Plots", command = self.plot_container.save_multiple_plots)
+        self.save_plots_button.grid(row = 0, column = 2, padx = (0, 150), sticky = "SE", pady = 30)       
 
         #Smooth variable and slider initialization
         self.smooth_value = tk.DoubleVar()

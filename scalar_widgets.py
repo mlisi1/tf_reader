@@ -15,6 +15,8 @@ try:
 except ImportError:
     from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as NavigationToolbar2TkAgg
 
+import cv2
+
 
 #================ TOOLBAR ===================
 # A custom class for NavigationToolbar2TkAgg; 
@@ -308,6 +310,7 @@ class PlotHandler(ttk.Frame):
 
         super().__init__(container, **args)
 
+        self.root_dir = os.getcwd()
         self.icon = tk.PhotoImage(file = './icons/minus.gif')
 
         self.scalars = []
@@ -500,7 +503,75 @@ class PlotHandler(ttk.Frame):
             
             plot.canvas.get_tk_widget().config(width = self.plot_size[0], height = self.plot_size[1])
 
+    #Save all the plots into a single image
+    def save_multiple_plots(self, mode = False):      
 
+        #piece of code to handle the positioning of multiple plots
+        #>could be better written
+        small = True
+        image = None
+        bottom_image = []
+
+        if len(self.plots) == 3:
+            small = False
+
+        if len(self.plots) > 3:
+            small = mode
+
+        for i, plot in enumerate(self.plots):            
+            
+            #Initialize the image 
+            if i == 0:
+                image = np.array(plot.fig.canvas.renderer.buffer_rgba())
+                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                continue
+
+            #vconcat if 2, hconcat if 3
+            if i < 3:   
+                new_image = np.array(plot.fig.canvas.renderer.buffer_rgba())
+                new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+                image = cv2.vconcat([image, new_image]) if small else cv2.hconcat([image, new_image])
+                continue
+
+            if i >= 3:                
+
+                #create a new bottom/side image
+                if i == 3:                    
+                    bottom_image = np.array(plot.fig.canvas.renderer.buffer_rgba())
+                    bottom_image = cv2.cvtColor(bottom_image, cv2.COLOR_RGB2BGR)
+                    continue
+
+                #hconcat/vconcat to bottom/side image depending on mode var
+                #>customizable by the user in the future
+                if len(bottom_image) != 0:                        
+                    new_image = np.array(plot.fig.canvas.renderer.buffer_rgba())
+                    new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+                    bottom_image = cv2.vconcat([bottom_image, new_image]) if small else cv2.hconcat([bottom_image, new_image])
+                    continue
+
+        #concat top/bottom or left/right images
+        if len(bottom_image) != 0:
+            extended_canvas = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
+            extended_canvas[0:bottom_image.shape[0], 0:bottom_image.shape[1]] = bottom_image
+
+            bottom_image = cv2.cvtColor(extended_canvas, cv2.COLOR_RGB2BGR)
+            image = cv2.hconcat([image, bottom_image]) if small else cv2.vconcat([image, bottom_image])
+
+
+        filepath = os.path.join(self.root_dir, 'saved_scalars/plots')
+
+        #If the dirs doesn't exist, create it
+        if not os.path.isdir(filepath):
+            os.mkdir(filepath)
+
+        #Save dialog window
+        file_path = tk.filedialog.asksaveasfilename(parent = self, initialdir = filepath, initialfile = "plot.png", 
+                    filetypes=(("PNG Image File", "*.png"), ("Bitmap", "*.bmp"), ("JPEG File", "*.jpg"), ("All files", "*.*")), 
+                    defaultextension = '.png')
+
+        #Save image
+        cv2.imwrite(file_path, image)  
+  
 
 
 
