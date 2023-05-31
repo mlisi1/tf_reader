@@ -33,6 +33,8 @@ class TFReaderWin(tk.Tk):
         self.grid_rowconfigure(0, weight=20)
         self.grid_columnconfigure(0, weight = 30)
 
+        self.rm_icon = tk.PhotoImage(file = './icons/minus.gif')
+
         self.root_dir = os.getcwd()
 
 
@@ -77,6 +79,7 @@ class TFReaderWin(tk.Tk):
         #Scalar list GUI arrays
         self.scalar_labels = []
         self.scalar_buttons = []
+        self.remove_buttons = []
         self.scalar_names = []
 
         #Button to add scalars initialization
@@ -163,6 +166,24 @@ class TFReaderWin(tk.Tk):
 
     #Just a convenient gruping for tkinter update functions; to be used instead of mainloop()
     def update_gui(self):
+
+        #Checks if a label has been triggered for removal
+        if len(self.scalar_labels)>1:
+            for i, label in enumerate(self.scalar_labels):
+                if label.removed:
+                    self.on_line_remove(i)
+                    break
+        #If there is only one line, simply clear all
+        elif len(self.scalar_labels)==1:
+            if self.scalar_labels[0].removed:
+                self.clear()
+
+        #If there are no plots, disable save plot button
+        if len(self.plot_container.plots) == 0:
+            self.save_plots_button.state(["disabled"])
+        else:
+            self.save_plots_button.state(["!disabled"])
+
         if self.plot_container is not None:
             if self.plot_container.need_to_update:
                 self.update_plot(self.get_smooth_value)
@@ -239,8 +260,10 @@ class TFReaderWin(tk.Tk):
             for i in range(len(self.scalar_labels)):
                 self.scalar_labels[i].destroy()
                 self.scalar_buttons[i].destroy()
+                self.remove_buttons[i].destroy()
             self.scalar_labels = []
             self.scalar_buttons = []
+            self.remove_buttons = []
         
         #index used if some scalars does not have valid data
         j = 0
@@ -266,15 +289,51 @@ class TFReaderWin(tk.Tk):
 
                 #create partial for instancing the Info window; for some reason lambda definition was not working
                 cmd = partial(self.info_win_bringup, self.params[i], self.scalar_names[i])
+                
 
                 #instantiate Info Button                
                 tmp_butt = ttk.Button(self.scalar_container.scrollable_frame, text = "Info", width = 4, command = cmd)              
-                tmp_butt.grid(column = 1, row = j)
+                tmp_butt.grid(column = 1, row = j, padx = 5)
+
+                tmp_rm = ttk.Button(self.scalar_container.scrollable_frame, image = self.rm_icon, width = 5, command = tmp.remove_lines)
+                tmp_rm.grid(column = 2, row = j, padx = 5)
 
                 #update button and labels list
                 self.scalar_labels.append(tmp)
                 self.scalar_buttons.append(tmp_butt)
+                self.remove_buttons.append(tmp_rm)
                 j+=1
+
+
+    #Method called on line removal; clears variables and updates scalar labels
+    def on_line_remove(self, index = 0):
+
+        #Remove label
+        self.scalar_labels[index].grid_remove()
+        self.scalar_labels[index].destroy()
+        self.scalar_labels.pop(index)
+
+        #Remove Info button
+        self.scalar_buttons[index].grid_remove()
+        self.scalar_buttons[index].destroy()
+        self.scalar_buttons.pop(index)
+
+        #Remve remove buttons
+        self.remove_buttons[index].grid_remove()
+        self.remove_buttons[index].destroy()
+        self.remove_buttons.pop(index)
+
+        #Pop removed scalar values
+        #>popping self.scalars[index] removes it also from PlotHandler.plots
+        self.scalar_names.pop(index)
+        self.params.pop(index)
+        self.max_values = np.delete(self.max_values, index)
+        self.scalars.pop(index)
+
+        #Call other update functions
+        self.plot_container.remove_line(index)
+        self.update_plot(self.get_smooth_value)
+        self.update_scalar_labels()
 
 
 

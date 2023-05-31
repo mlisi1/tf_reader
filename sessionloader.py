@@ -137,7 +137,8 @@ class SessionLoader:
 	#Generates the name string for the session
 	def get_name(self, session):
 
-		string = f'{session.model_tags}\n{session.reward_tags} [{session.params[0].hidden_size},{session.params[0].batch_size}]\n'
+		model_t = session.model_tags.replace("[AWG] ","")
+		string = f'{model_t}\n{session.reward_tags} [{session.params[0].hidden_size},{session.params[0].batch_size}]\n'
 		return string
 
 	#Scalar retrieval function; checks all the selected tags

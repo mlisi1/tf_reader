@@ -248,7 +248,8 @@ class ScalarLabel(ttk.Label):
     def __init__(self, container, text, lines, update_fns):
 
         #Initialize label
-        super().__init__(container, text = text)
+        self.font = ("Verdana", 9)
+        super().__init__(container, text = text, font = self.font)
 
         #Get line and line color
         self.lines = lines
@@ -256,6 +257,8 @@ class ScalarLabel(ttk.Label):
             self.color = lines[0].get_color()
         else:
             self.color = "#000000"
+
+        self.removed = False
 
         #Assign the color to the label
         self.configure(foreground = self.color)
@@ -269,7 +272,6 @@ class ScalarLabel(ttk.Label):
 
     #Method called externally; updates the assigned line if plot has changed
     def update_lines(self, lines, update_fns):
-
         
         self.lines = lines
         self.update_fns = update_fns
@@ -296,6 +298,22 @@ class ScalarLabel(ttk.Label):
             for i, line in enumerate(self.lines):
                 self.lines[i].set_linewidth(1)
                 self.update_fns[i]()
+
+    #Removes this scalar label's lines
+    def remove_lines(self):
+
+        #Undraw lines
+        for i, line in enumerate(self.lines):
+
+            line.remove()
+            self.update_fns[i]()
+
+        #Call for a higher level update
+        self.lines = None
+        self.removed = True
+       
+
+
 
 
 
@@ -337,6 +355,10 @@ class PlotHandler(ttk.Frame):
         self.add_butt = ttk.Button(self.top_frame, text = "Add", command = self.add_plot)
         self.add_butt.grid(row = 0, column = 1, padx = 10, pady = 5, sticky = "NE")
 
+        self.remove_plots_button = ttk.Button(self.top_frame, text = "Remove all plots", command = self.remove_all_plots)
+        self.remove_plots_button.grid(row = 0, column = 2, padx = 10, pady = 5, sticky = "NE")
+        self.remove_plots_button.state(["disabled"])
+
 
         #Fixed grid positions for the plots
         self.positions = [(1,1), (2,1), (1,2), (2,2), (1,3), (2,3)]       
@@ -348,7 +370,24 @@ class PlotHandler(ttk.Frame):
         self.remove_buttons = []
 
         #Variable used to trigger root update
-        self.need_to_update = False        
+        self.need_to_update = False
+
+
+    #Self explainatory
+    def remove_all_plots(self):
+
+        for plot in self.plots:
+            self.remove_plot(plot)
+
+
+
+    #Clears remeved lines data
+    def remove_line(self, index):
+
+        for plot in self.plots:
+            plot.line.pop(index)
+            plot.colors.pop(index)
+            plot.data.pop(index)
 
      
     #Gets the correct plot sizes based on the window size
@@ -426,6 +465,8 @@ class PlotHandler(ttk.Frame):
         self.update_plots(0.0)
         self.need_to_update = True
 
+        self.remove_plots_button.state(["!disabled"])
+
         #Max plot number is 6
         if len(self.plots) == 6:
 
@@ -483,6 +524,9 @@ class PlotHandler(ttk.Frame):
         self.update_grid()
         self.need_to_update = True
         self.add_butt.state(["!disabled"])
+
+        if len(self.plots) == 0:
+            self.remove_plots_button.state(["disabled"])
 
     #Calls the clear function for every plot
     def clear(self):
