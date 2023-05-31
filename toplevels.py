@@ -97,28 +97,30 @@ class SelectScalarWin(tk.Toplevel):
         #Model Tag option Menu and Label
         self.model_option_label = tk.Label(self, text = "Model Tags:")
         self.model_option_label.grid(row = 0, column = 0, sticky = "NW", padx = 10, pady = 3)
-        self.model_options = ttk.OptionMenu(self, self.parent.model_choice, self.parent.model_choice.get(), *self.parent.available_models)
+        self.model_options = ttk.OptionMenu(self, variable = self.parent.model_choice)
         self.model_options.config(width = 23)
         self.model_options.grid(row = 1, column = 0, sticky = "NW", padx = 10, pady = 3)
 
         #Reward Tag option Menu and Label
         self.reward_option_label = tk.Label(self, text = "Reward Tags:")
         self.reward_option_label.grid(row = 2, column = 0, sticky = "NW", padx = 10, pady = 3)
-        self.reward_options = ttk.OptionMenu(self, self.parent.reward_choice, self.parent.reward_choice.get(), *self.parent.available_rewards)
+        self.reward_options = ttk.OptionMenu(self, self.parent.reward_choice)
         self.reward_options.config(width = 23)
         self.reward_options.grid(row = 3, column = 0, sticky = "NW", padx = 10, pady = 3)   
         
         #Network size option Menu and Label initialization
         self.size_label = ttk.Label(self, text  = "Network Size:")
         self.size_label.grid(row = 4, column = 0, sticky = "NW", padx = 10, pady = 3)
-        self.size_option = ttk.OptionMenu(self, self.parent.size_choice, self.parent.size_choice.get(), *self.parent.sizes, command = self.choose_size)
-        self.size_option.grid(row = 5, column = 0, sticky = "NW", padx = 10, pady = 3)
-        self.size_option.config(width = 23)
+        self.size_options = ttk.OptionMenu(self, self.parent.size_choice, command = self.choose_size)
+        self.size_options.grid(row = 5, column = 0, sticky = "NW", padx = 10, pady = 3)
+        self.size_options.config(width = 23)
 
         #Select Button
         self.select_butt = ttk.Button(self, text = "Select", command = self.select_scalar)
         self.select_butt.place(x = 80, y = 260)
         self.select_butt.grid(row = 6, column = 0, sticky = "NWES", padx = 70, pady = (30, 10))
+
+        self.update_entries()
 
     #Method called on window destroy
     def on_destroy(self):
@@ -148,3 +150,53 @@ class SelectScalarWin(tk.Toplevel):
         #Add scalar to plot and destroy window
         self.parent.append_scalar()
         self.on_destroy()
+
+
+    #Update menu entries if a new scalar has been externally loaded
+    def update_entries(self):
+
+        #Save last choice and reset options
+        last_choice = self.parent.model_choice.get()
+        self.parent.model_choice.set("")
+        self.model_options["menu"].delete(0,"end")
+
+        #Load the new choices       
+        for choice in self.parent.available_models:
+            self.model_options["menu"].add_command(label = choice, command=tk._setit(self.parent.model_choice, choice))
+
+        #Find the "new" last choice and set it
+        idx = [i for i, choice in enumerate(self.parent.available_models) if choice == last_choice][0]
+        last_model_choice = self.parent.available_models[idx]
+        self.parent.model_choice.set(last_model_choice)
+
+
+
+        #Save last choice and reset options
+        last_choice = self.parent.reward_choice.get()
+        self.parent.reward_choice.set("")
+        self.reward_options["menu"].delete(0,"end")   
+
+        #Load the new choices    
+        for choice in self.parent.available_rewards:
+            self.reward_options["menu"].add_command(label = choice, command=tk._setit(self.parent.reward_choice, choice))
+
+        #Find the "new" last choice and set it
+        idx = [i for i, choice in enumerate(self.parent.available_rewards) if choice == last_choice][0]
+        last_reward_choice = self.parent.available_rewards[idx]
+        self.parent.reward_choice.set(last_reward_choice)
+
+
+
+        #Save last choice and reset options
+        last_choice = self.parent.size_choice.get()
+        self.parent.size_choice.set("")
+        self.size_options["menu"].delete(0,"end")      
+
+        #Load the new choices 
+        for choice in self.parent.sizes:
+            self.size_options["menu"].add_command(label = choice, command=tk._setit(self.parent.size_choice, choice))
+
+        #Find the "new" last choice and set it
+        idx = [i for i, choice in enumerate(self.parent.sizes) if choice == last_choice][0]
+        last_size_choice = self.parent.sizes[idx]
+        self.parent.size_choice.set(last_size_choice)

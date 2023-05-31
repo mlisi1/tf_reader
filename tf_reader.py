@@ -4,6 +4,7 @@ import re
 from functools import partial
 import datetime
 import numpy as np
+import copy
 
 #GUI
 import tkinter as tk
@@ -37,6 +38,13 @@ class TFReaderWin(tk.Tk):
 
         self.root_dir = os.getcwd()
 
+        self.menu_bar = tk.Menu(self)
+        self.file_menu = tk.Menu(self.menu_bar, tearoff = 0)
+        self.file_menu.add_command(label = "Add single training folder", command = self.add_training_dir_bringup)
+
+        self.menu_bar.add_cascade(labe = "File", menu = self.file_menu)
+        self.config(menu = self.menu_bar)
+
 
         #Scalar list frame initialization
         self.scalar_container = ScrollableFrame(self, 20, 2, width = 270, height = 400)
@@ -57,13 +65,13 @@ class TFReaderWin(tk.Tk):
         self.loader.parse_sessions()
 
         #Model choice variables
-        self.available_models = self.loader.model_tags
+        self.available_models = copy.copy(self.loader.model_tags)
         self.available_models.append("All")
         self.model_choice = tk.StringVar()
         self.model_choice.set(self.available_models[0])
 
         #Size choice variables
-        self.sizes = self.loader.size_tags #["256,32", "256,64", "512,64", "512,128", "All"]
+        self.sizes = copy.copy(self.loader.size_tags)
         self.sizes.append("All")
         self.size_choice = tk.StringVar()
         self.size_choice.set(self.sizes[0])
@@ -71,7 +79,7 @@ class TFReaderWin(tk.Tk):
         self.chosen_hid = 256
     
         #Reward choice variables
-        self.available_rewards = self.loader.reward_tags
+        self.available_rewards = copy.copy(self.loader.reward_tags)
         self.available_rewards.append("All")        
         self.reward_choice = tk.StringVar()
         self.reward_choice.set(self.available_rewards[0])
@@ -167,6 +175,9 @@ class TFReaderWin(tk.Tk):
     #Just a convenient gruping for tkinter update functions; to be used instead of mainloop()
     def update_gui(self):
 
+        #Check if new scalars are added to update tags choice menu entries
+        if self.loader.entries_update:
+            self.update_menu_entries()
         #Checks if a label has been triggered for removal
         if len(self.scalar_labels)>1:
             for i, label in enumerate(self.scalar_labels):
@@ -337,6 +348,26 @@ class TFReaderWin(tk.Tk):
 
 
 
+    def update_menu_entries(self):
+
+        #Model choice variables
+        self.available_models = copy.copy(self.loader.model_tags)
+        self.available_models.append("All")
+
+        #Size choice variables
+        self.sizes = copy.copy(self.loader.size_tags)
+        self.sizes.append("All")
+    
+        #Reward choice variables
+        self.available_rewards = copy.copy(self.loader.reward_tags)
+        self.available_rewards.append("All")        
+
+        self.loader.entries_update = False
+        
+
+
+
+
 
     #===================TOPLEVEL BRINGUP FUNCTIONS=========================
     #Bringup Select Scalar Window if there is no toplevel already
@@ -350,6 +381,26 @@ class TFReaderWin(tk.Tk):
         if self.toplevel is None:
 
             self.toplevel = InfoWindow(self, params, scalar_name)
+
+    #Bringup for path asking window; used to load external scalars
+    def add_training_dir_bringup(self):
+
+        folder_path = tk.filedialog.askdirectory(title = "Load scalar from directory",
+                        initialdir = self.root_dir,
+                        mustexist = True)
+
+        #Append the new session if valid
+        tmp = self.loader.generate_session(folder_path, from_gui = True)
+
+        #SessionLoader.generate_session() returns -1 in case of any failure
+        # while preprocessing data
+        if tmp == -1:
+            tk.messagebox.showerror("Error", "The selected folder does not contain a valid scalar.")
+
+
+
+
+
 
     #======================LOAD FUNCTIONS =====================================
     #Load scalar from selected session(s) and update plot

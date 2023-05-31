@@ -56,6 +56,8 @@ class SessionLoader:
 		self.model_dict = {}
 		self.main_dir = os.getcwd()
 
+		self.entries_update = False
+
 	#Retrieves all the combinations of 'hidden_size, batch_size' from the params dataclass
 	def get_size_tags(self):
 
@@ -72,28 +74,31 @@ class SessionLoader:
 	#Updates model tags dict assigning every folder to its model tag combination
 	def update_tags_dict(self, folder_name,):       
         
-        #Find matches
+      #Find matches
 		pattern = r'(.*) \| (.*)'
 		match = re.match(pattern, folder_name)
 
 		if match:
 
 			#Strip tags of unnecessary characters
-		    model_tags = match.group(1).strip("Ant ")
+			model_tags = match.group(1).strip("Ant ")
 
-		    #Create entry if new; else append to existing values
-		    if model_tags in self.model_dict:
-		  
-		        self.model_dict[model_tags].append(glob.glob(glob.escape(folder_name))[0])
-		    else:
-		        self.model_dict[model_tags] = [glob.glob(glob.escape(folder_name))[0]]
+			#Create entry if new; else append to existing values
+			if model_tags in self.model_dict:
+				
+				self.model_dict[model_tags].append(glob.glob(glob.escape(folder_name))[0])
+			else:
+				
+				self.model_dict[model_tags] = [glob.glob(glob.escape(folder_name))[0]]
+				
 
 	#Retrives correct session folder after model and reward tags
 	def retrieve_folder(self, model, reward):
 
-   		
+  
 		mod = model.strip('Ant ')
 		rew = reward
+
 
 
 		for key in self.model_dict.keys():
@@ -120,7 +125,7 @@ class SessionLoader:
 
 					#All reward selected
 					if rew == "All":
-
+				
 						yield value
 
 					#Check reward
@@ -147,8 +152,10 @@ class SessionLoader:
 		os.chdir(self.trainings_dir)
 		tmp = []
 
+
 		#Find only relevant session folders
 		selected_folder_iterator = self.retrieve_folder(model, reward)
+
 
 		#Initialize pool
 		if pool is None:
@@ -156,7 +163,6 @@ class SessionLoader:
 
 		for folder in selected_folder_iterator:
 
-			
 			for session in self.sessions:
 				
 				if folder+'/' in session.tf_events_path:
@@ -164,35 +170,95 @@ class SessionLoader:
 					#Check for size matches                                         
 					if session.params[0].batch_size == batch and session.params[0].hidden_size == hid and batch != 0 and hid != 0:
 
-						#Append [session, session_name]
+						#Append [session, session_name, training_parameters]
 						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])          
 
 					#All sizes selected             
 					if batch == 0 and hid == 0:
 
-						#Append [session, session_name]
+						#Append [session, session_name, training_parameters]
 						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])  
 
-		os.chdir(self.main_dir)
-		                  
+		os.chdir(self.main_dir)           
            
 		return tmp
+
+
+
+	#Allocates correct paths and names to TrainingSession dataclass
+	#>supports call via GUI
+	def generate_session(self, path = None, model_tags = None, reward_tags = None, directory = None, from_gui = False):
+
+		assert path != None
+
+		#If the fn was called by GUI, preprocess the only argument: path
+		if from_gui:
+
+			try:
+
+
+				model = os.path.basename(os.path.dirname(path))
+				global_path = glob.glob(glob.escape(os.path.dirname(path)))
+
+				#Update manually model dict
+				model_tags, reward_tags = model.split('|')
+				if model_tags in self.model_dict:
+				
+					self.model_dict[model_tags.strip("Ant ")].append(global_path)
+
+				else:
+					
+					self.model_dict[model_tags.strip("Ant ")] = global_path
+
+
+				directory = path
+
+				#Generate model and reward tags "dict"
+				if model_tags not in self.model_tags:
+					self.model_tags.append(model_tags)
+
+				if reward_tags not in self.reward_tags:
+					self.reward_tags.append(reward_tags)
+				self.entries_update = True
+
+			#Return value for Error window
+			except Exception as e:
+				return -1
+
+
+
+		#Assign values to training session
+		temp = TrainingSession()
+		temp.model_tags = model_tags
+		temp.reward_tags = reward_tags
+		temp.tags_dir = directory
+
+		#Retrieve .params file
+		#>a dataclass printed to the file during training
+		params_path = glob.glob(glob.escape(f"{path}")+"/*/*.params")[0]                   
+		temp.params_path = params_path
+
+		#Parse .params file
+		temp.params = self.read_dataclass_file(params_path, TrainingParameters)
+
+		#Retrieve tf_events file path
+		tf_events_path = glob.glob(glob.escape(f"{path}")+"/*/*/events*")[0]         
+		temp.tf_events_path = tf_events_path
+
+
+		self.sessions.append(temp)
 
 
 	#Scans training dir and seeks for sessions
 	#>exclude_faults = True discards training with a valid tag name but that ends with .something
 	def parse_sessions(self, exclude_faults=True):
 
-        #Reset tags
-		self.model_tags = []
-		self.reward_tags = []
-
-        #Go to trainings dir		
+      #Go to trainings dir		
 		os.chdir(self.trainings_dir)
 
 		for directory in glob.glob('*'):
 
-            #Exclude every dir ending in .something
+         #Exclude every dir ending in .something
 			if exclude_faults and '.' in directory:
 				continue
 
@@ -213,26 +279,8 @@ class SessionLoader:
 
 			for model in sub_models:
 
-				#Assign values to training session
-				temp = TrainingSession()
-				temp.model_tags = model_tags
-				temp.reward_tags = reward_tags
-				temp.tags_dir = directory
+				self.generate_session(model, model_tags, reward_tags, directory)
 
-				#Retrieve .params file
-				#>a dataclass printed to the file during training
-				params_path = glob.glob(glob.escape(f"{model}")+"/*/*.params")[0]                   
-				temp.params_path = params_path
-
-				#Parse .params file
-				temp.params = self.read_dataclass_file(params_path, TrainingParameters)
-
-				#Retrieve tf_events file path
-				tf_events_path = glob.glob(glob.escape(f"{model}")+"/*/*/events*")[0]         
-				temp.tf_events_path = tf_events_path
-
-
-				self.sessions.append(temp)
 
 		os.chdir(self.main_dir)
 		self.get_size_tags()

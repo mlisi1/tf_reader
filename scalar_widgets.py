@@ -340,8 +340,7 @@ class PlotHandler(ttk.Frame):
         self.scalar_choice.set(self.scalar_tags[0])
 
         self.root_size = None
-        self.offset = (300, 220)
-        
+        self.offset = (300, 220)      
 
  
         #Top frame used for the scalar tag choice and to add plots
@@ -361,9 +360,8 @@ class PlotHandler(ttk.Frame):
 
 
         #Fixed grid positions for the plots
-        self.positions = [(1,1), (2,1), (1,2), (2,2), (1,3), (2,3)]       
+        self.positions = [(1,1), (2,1), (1,2), (2,2), (1,3), (2,3)]   
 
-     
         self.frames = []
         self.plots = []
         self.labels = []
@@ -374,10 +372,16 @@ class PlotHandler(ttk.Frame):
 
 
     #Self explainatory
+    #>inexplicably, it only works like this
     def remove_all_plots(self):
 
-        for plot in self.plots:
-            self.remove_plot(plot)
+        for i in range(len(self.plots)-1):
+            
+            self.remove_plot(self.plots[i])
+
+        self.remove_plot(self.plots[0])
+
+
 
 
 
