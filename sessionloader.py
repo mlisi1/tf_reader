@@ -101,6 +101,7 @@ class SessionLoader:
 
 
 
+
 		for key in self.model_dict.keys():
 
 			#All models selected
@@ -231,19 +232,19 @@ class SessionLoader:
 		temp = TrainingSession()
 		temp.model_tags = model_tags
 		temp.reward_tags = reward_tags
-		temp.tags_dir = directory
+		temp.tags_dir = os.path.abspath(directory)
 
 		#Retrieve .params file
 		#>a dataclass printed to the file during training
 		params_path = glob.glob(glob.escape(f"{path}")+"/*/*.params")[0]                   
-		temp.params_path = params_path
+		temp.params_path = os.path.abspath(params_path)
 
 		#Parse .params file
 		temp.params = self.read_dataclass_file(params_path, TrainingParameters)
 
 		#Retrieve tf_events file path
 		tf_events_path = glob.glob(glob.escape(f"{path}")+"/*/*/events*")[0]         
-		temp.tf_events_path = tf_events_path
+		temp.tf_events_path = os.path.abspath(tf_events_path)
 
 
 		self.sessions.append(temp)
@@ -251,18 +252,33 @@ class SessionLoader:
 
 	#Scans training dir and seeks for sessions
 	#>exclude_faults = True discards training with a valid tag name but that ends with .something
-	def parse_sessions(self, exclude_faults=True):
+	def parse_sessions(self, path = None, exclude_faults = True, from_gui = False):
 
       #Go to trainings dir		
-		os.chdir(self.trainings_dir)
+		if path == None:
+
+			os.chdir(self.trainings_dir)
+
+		else:
+
+			os.chdir(glob.glob(glob.escape(os.path.dirname(path)))[0])
+			self.entries_update = True
 
 		for directory in glob.glob('*'):
 
-         #Exclude every dir ending in .something
+			#Exclude every dir ending in .something
 			if exclude_faults and '.' in directory:
 				continue
+		
+			if path != None:
+				if directory != os.path.basename(path):
+					continue
+
+
+
 
 			self.update_tags_dict(directory)
+
 			#Split dir name string
 			model_tags, reward_tags = directory.split('|')
 
@@ -279,8 +295,10 @@ class SessionLoader:
 
 			for model in sub_models:
 
-				self.generate_session(model, model_tags, reward_tags, directory)
+				tmp = self.generate_session(model, model_tags, reward_tags, directory)
 
+				if tmp == -1:
+					raise Exception
 
 		os.chdir(self.main_dir)
 		self.get_size_tags()

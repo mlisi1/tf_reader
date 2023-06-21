@@ -340,7 +340,7 @@ class PlotHandler(ttk.Frame):
         self.scalar_choice.set(self.scalar_tags[0])
 
         self.root_size = None
-        self.offset = (300, 220)      
+        self.offset = (340, 220)      
 
  
         #Top frame used for the scalar tag choice and to add plots
@@ -380,9 +380,6 @@ class PlotHandler(ttk.Frame):
             self.remove_plot(self.plots[i])
 
         self.remove_plot(self.plots[0])
-
-
-
 
 
     #Clears remeved lines data

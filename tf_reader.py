@@ -41,13 +41,14 @@ class TFReaderWin(tk.Tk):
         self.menu_bar = tk.Menu(self)
         self.file_menu = tk.Menu(self.menu_bar, tearoff = 0)
         self.file_menu.add_command(label = "Add single training folder", command = self.add_training_dir_bringup)
+        self.file_menu.add_command(label = "Add tag folder", command = self.add_tag_dir_bringup)
 
         self.menu_bar.add_cascade(labe = "File", menu = self.file_menu)
         self.config(menu = self.menu_bar)
 
 
         #Scalar list frame initialization
-        self.scalar_container = ScrollableFrame(self, 20, 2, width = 270, height = 400)
+        self.scalar_container = ScrollableFrame(self, 20, 2, width = 300, height = 400)
         self.scalar_container.grid(row = 0, column = 2, sticky = "E", pady = (100, 20), padx = (0, 10))         
 
         #Save button
@@ -118,7 +119,7 @@ class TFReaderWin(tk.Tk):
 
 
         self.save_plots_button = ttk.Button(self, text = "Save Plots", command = self.plot_container.save_multiple_plots)
-        self.save_plots_button.grid(row = 0, column = 2, padx = (0, 150), sticky = "SE", pady = 30)       
+        self.save_plots_button.grid(row = 0, column = 2, padx = (0, 170), sticky = "SE", pady = 30)       
 
         #Smooth variable and slider initialization
         self.smooth_value = tk.DoubleVar()
@@ -396,6 +397,25 @@ class TFReaderWin(tk.Tk):
         # while preprocessing data
         if tmp == -1:
             tk.messagebox.showerror("Error", "The selected folder does not contain a valid scalar.")
+
+
+    def add_tag_dir_bringup(self):
+
+        folder_path = tk.filedialog.askdirectory(title = "Load scalars from tag directory",
+                        initialdir = self.root_dir,
+                        mustexist = True)
+
+        #Append the new session if valid
+        try:
+            self.loader.parse_sessions(folder_path)
+
+        except Exception as e:
+
+            tk.messagebox.showerror("Error", "The selected folder is not a valid tag directory.")
+
+        #SessionLoader.generate_session() returns -1 in case of any failure
+        # while preprocessing data
+      
 
 
 
