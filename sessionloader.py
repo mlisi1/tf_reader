@@ -54,6 +54,7 @@ class SessionLoader:
 		self.size_tags = []
 		self.sessions = []
 		self.model_dict = {}
+		self.size_dict = {}
 		self.main_dir = os.getcwd()
 
 		self.entries_update = False
@@ -73,8 +74,8 @@ class SessionLoader:
 
 	#Updates model tags dict assigning every folder to its model tag combination
 	def update_tags_dict(self, folder_name,):       
-        
-      #Find matches
+		
+	  #Find matches
 		pattern = r'(.*) \| (.*)'
 		match = re.match(pattern, folder_name)
 
@@ -85,12 +86,50 @@ class SessionLoader:
 
 			#Create entry if new; else append to existing values
 			if model_tags in self.model_dict:
-				
+			
 				self.model_dict[model_tags].append(glob.glob(glob.escape(folder_name))[0])
 			else:
 				
 				self.model_dict[model_tags] = [glob.glob(glob.escape(folder_name))[0]]
 				
+
+	#Updates available sizes for model+reward tags
+	def update_size_dict(self):
+
+		#Scan sessions
+		for session in self.sessions:
+
+			key = session.model_tags+session.reward_tags
+			size = [session.params[0].hidden_size, session.params[0].batch_size, 1]
+			match = None
+
+			#If key in dict
+			if key in self.size_dict.keys():
+				
+				#If the size is already in values
+				for i, item in enumerate(self.size_dict[key]):
+
+					if size[0] == item[0] and size[1] == item[1]:
+
+						match = i
+						break
+
+				#Increase size counter 
+				#> OptionsMenu will show as entr "hidden_size, batch_size (n entries)"
+				if match is not None:
+
+					self.size_dict[key][match][-1] += 1
+
+				#Else, add it
+				else:
+
+					self.size_dict[key].append(size)
+
+			#Else, add it
+			else:
+				
+				self.size_dict[key] = [size]
+
 
 	#Retrives correct session folder after model and reward tags
 	def retrieve_folder(self, model, reward):
@@ -126,7 +165,7 @@ class SessionLoader:
 
 					#All reward selected
 					if rew == "All":
-				
+						
 						yield value
 
 					#Check reward
@@ -181,7 +220,7 @@ class SessionLoader:
 						tmp.append([pool.apply(self.process_session, args=(session,)), self.get_name(session), session.params[0]])  
 
 		os.chdir(self.main_dir)           
-           
+		
 		return tmp
 
 
@@ -254,7 +293,7 @@ class SessionLoader:
 	#>exclude_faults = True discards training with a valid tag name but that ends with .something
 	def parse_sessions(self, path = None, exclude_faults = True, from_gui = False):
 
-      #Go to trainings dir		
+	  #Go to trainings dir		
 		if path == None:
 
 			os.chdir(self.trainings_dir)
@@ -289,7 +328,7 @@ class SessionLoader:
 
 			if reward_tags not in self.reward_tags:
 				self.reward_tags.append(reward_tags)
-            
+			
 			#Get different training in model|reward dirs
 			sub_models = glob.glob(glob.escape(f'{directory}')+'/*')
 
