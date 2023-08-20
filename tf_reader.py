@@ -101,10 +101,6 @@ class TFReaderWin(tk.Tk):
 		#Toplevel variable; used to only allow one additional window at a time
 		self.toplevel = None
 		
-		#calls the SessionLoader to attempt a first load for initialization purposes
-		self.frame = None
-		self.plot_container = None
-		  
 
 		#Model tag choice variables initialization
 		self.tags = [""]
@@ -550,10 +546,10 @@ class TFReaderWin(tk.Tk):
 				f.write("Scalars Plotted:\n")      
 				for i in range(len(self.scalars)):
 
-					scalar_tag = re.sub(r'Ant-v4-', "",self.frame.scalar_name[i]).strip(':').strip('\n')
 					name = self.scalar_names[i].split('\n')
+					max_value = self.max_values[i] if self.max_values[i] != -1000 else "NO DATA"
 
-					f.write(f'{name[0]}{name[1]}   Max Test Avg: {self.max_values[i]}   Scalar Tag: {scalar_tag}\n')
+					f.write(f'{name[0]}|{name[1]}  			 Max Test Avg: {max_value}\n')
 
 
 			

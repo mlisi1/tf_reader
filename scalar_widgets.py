@@ -3,11 +3,13 @@ from tkinter import ttk
 
 import numpy as np
 import os
+import copy
 
 #Matplotlib plot utilities and tk wrapper
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import matplotlib
 matplotlib.use("TkAgg")
 try:
@@ -276,7 +278,6 @@ class ScalarLabel(ttk.Label):
 	#Method called externally; updates the assigned line if plot has changed
 	def update_lines(self, lines, update_fns):
 		
-		print(lines)
 		self.lines = lines
 		self.update_fns = update_fns
 		if self.lines != None:
@@ -563,74 +564,71 @@ class PlotHandler(ttk.Frame):
 			
 			plot.canvas.get_tk_widget().config(width = self.plot_size[0], height = self.plot_size[1])
 
-	#Save all the plots into a single image
-	def save_multiple_plots(self, mode = False):      
+	#Save all the displayed plots into a single image
+	def save_multiple_plots(self):
 
-		#piece of code to handle the positioning of multiple plots
-		#>could be better written
-		small = True
-		image = None
-		bottom_image = []
+		#copy the Figures to resize them beforehand (won't loose quality)
+		images = []
+		figs = [copy.deepcopy(plot.fig) for plot in self.plots]
 
-		if len(self.plots) == 3:
-			small = False
+		for fig in figs:
 
-		if len(self.plots) > 3:
-			small = mode
+			#Modify height and width
+			fig.set_figwidth(10)
+			fig.set_figheight(10)
 
-		for i, plot in enumerate(self.plots):            
-			
-			#Initialize the image 
-			if i == 0:
-				image = np.array(plot.fig.canvas.renderer.buffer_rgba())
-				image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-				continue
+			#Cast to FigureCanvas
+			canvas = FigureCanvasAgg(fig)
+			canvas.draw()
 
-			#vconcat if 2, hconcat if 3
-			if i < 3:   
-				new_image = np.array(plot.fig.canvas.renderer.buffer_rgba())
-				new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
-				image = cv2.vconcat([image, new_image]) if small else cv2.hconcat([image, new_image])
-				continue
+			#Render to RGBA
+			image = np.array(canvas.renderer.buffer_rgba())
+			image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+			images.append(image)
 
-			if i >= 3:                
+		del figs
 
-				#create a new bottom/side image
-				if i == 3:                    
-					bottom_image = np.array(plot.fig.canvas.renderer.buffer_rgba())
-					bottom_image = cv2.cvtColor(bottom_image, cv2.COLOR_RGB2BGR)
-					continue
+		#Initialize top and bottom image
+		#> the plots are saved following this order:
+		# 1 	2 	3 		-> top_image
+		# 4 	5 	6 		-> bottom_image
+		top_image = images[0]
+		bottom_image = images[3] if len(images)>3 else None
 
-				#hconcat/vconcat to bottom/side image depending on mode var
-				#>customizable by the user in the future
-				if len(bottom_image) != 0:                        
-					new_image = np.array(plot.fig.canvas.renderer.buffer_rgba())
-					new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
-					bottom_image = cv2.vconcat([bottom_image, new_image]) if small else cv2.hconcat([bottom_image, new_image])
-					continue
+		#Horizontally concatenate images
+		for i, image in enumerate(images):
 
-		#concat top/bottom or left/right images
-		if len(bottom_image) != 0:
-			extended_canvas = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
-			extended_canvas[0:bottom_image.shape[0], 0:bottom_image.shape[1]] = bottom_image
+			if 0<i<3:
+				top_image = cv2.hconcat([top_image, image])
 
-			bottom_image = cv2.cvtColor(extended_canvas, cv2.COLOR_RGB2BGR)
-			image = cv2.hconcat([image, bottom_image]) if small else cv2.vconcat([image, bottom_image])
+			if i>3:
+				bottom_image = cv2.hconcat([bottom_image, image])
+
+		#Add bottom image to a canvas the same width of top_image to concatenate vertically
+		if bottom_image is not None:
+			canvas = np.full(top_image.shape, 255, dtype=np.uint8)
+			canvas[:bottom_image.shape[0], :bottom_image.shape[1]] = bottom_image
+
+		final_image = cv2.vconcat([top_image, canvas]) if bottom_image is not None else top_image
 
 
+		#Save path file dialog
 		filepath = os.path.join(self.root_dir, 'saved_scalars/plots')
+		os.makedirs(filepath, exist_ok=True)
 
-		#If the dirs doesn't exist, create it
-		if not os.path.isdir(filepath):
-			os.mkdir(filepath)
+		filetypes = [("PNG Image File", "*.png"), ("Bitmap", "*.bmp"), ("JPEG File", "*.jpg"), ("All files", "*.*")]
+		default_extension = '.png'
 
-		#Save dialog window
-		file_path = tk.filedialog.asksaveasfilename(parent = self, initialdir = filepath, initialfile = "plot.png", 
-					filetypes=(("PNG Image File", "*.png"), ("Bitmap", "*.bmp"), ("JPEG File", "*.jpg"), ("All files", "*.*")), 
-					defaultextension = '.png')
+		file_path = tk.filedialog.asksaveasfilename(
+			parent=None,
+			initialdir=filepath,
+			initialfile="plot.png",
+			filetypes=filetypes,
+			defaultextension=default_extension
+		)
 
-		#Save image
-		cv2.imwrite(file_path, image)  
+		if file_path:
+			cv2.imwrite(file_path, final_image)		
 
 
 	#Updates scalar tags listing them from the loaded ones

@@ -345,6 +345,8 @@ class SessionLoader:
 	#Dataclass parsing function; used to read training dataclass file
 	def read_dataclass_file(self, filename: str, dataclass_type: Type = TrainingParameters) -> List:
 
+		bool_mapping = {"true": True, "false": False}
+		
 		#Open file
 		with open(filename, 'r') as f:
 			lines = f.readlines()
@@ -376,7 +378,15 @@ class SessionLoader:
 					if attr_value != "None":
 						
 						#Cast the value to its correct type and update new dataclass
-						attr_value = attr_type(attr_value)
+						if attr_type is not bool:
+							
+							attr_value = attr_type(attr_value)
+
+						else:
+
+							attr_value = attr_value.lower()
+							attr_value = bool_mapping[attr_value]
+
 						if objects:
 							obj = objects[-1]
 							setattr(obj, attr_name, attr_value)
