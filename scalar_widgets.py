@@ -388,14 +388,11 @@ class PlotHandler(ttk.Frame):
 
 
 	#Self explainatory
-	#>inexplicably, it only works like this
 	def remove_all_plots(self):
 
-		for i in range(len(self.plots)-1):
-			
-			self.remove_plot(self.plots[i])
+		for i in range(len(self.plots)):
 
-		self.remove_plot(self.plots[0])
+			self.remove_plot(self.plots[0])
 
 
 	#Clears remeved lines data
@@ -529,6 +526,7 @@ class PlotHandler(ttk.Frame):
 
 			if plot == rm_plot:
 
+				plt.close(plot.fig)
 				self.plots[i].destroy()
 				self.labels[i].destroy()
 				self.frames[i].destroy()
