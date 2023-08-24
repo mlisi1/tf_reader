@@ -4,6 +4,7 @@ from tkinter import ttk
 import numpy as np
 import os
 import copy
+import re
 
 #Matplotlib plot utilities and tk wrapper
 import matplotlib.pyplot as plt
@@ -139,14 +140,20 @@ class PlotContainer(ttk.Frame):
 		#Delete previous data
 		del self.data
 		self.data = []  
-		
+
 
 		#Gather correct values
 		for i in range(len(self.scalars)):
-			 
-			data = self.scalars[i][self.scalars[i]['tag'] == self.scalar_name]   
-			self.data.append(data)       
 
+			if type(self.scalar_name) == list:
+
+				data = [self.scalars[i][self.scalars[i]['tag'] == self.scalar_name[j]] for j in range(len(self.scalar_name))]
+				self.data.append(data)  
+
+			else:	
+				 
+				data = self.scalars[i][self.scalars[i]['tag'] == self.scalar_name]   
+				self.data.append(data)    
 
 
 	#Updates the plot with the scalars data
@@ -169,25 +176,75 @@ class PlotContainer(ttk.Frame):
 			#Gather plot data
 			self.data_from_scalar()
 			if len(self.data[i]) > 0:
-				x = self.data[i]['step']
-				y = self.smooth(self.data[i]['value'].values, smooth_value)
-				p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
-				
-				#Update plot limit values
-				if p < min_x:
-					min_x = p
-				if q > max_x:
-					max_x = q
-				if r < min_y:
-					min_y = r
-				if s > max_y:
-					max_y = s
 
-			   
-				#Draw line and store color
-				tmp, = self.ax.plot(x, y)
-				self.line.append(tmp)
-				self.colors.append(self.line[i].get_color())
+				if type(self.data[i]) == list:
+
+					style = ['-', '--', ':']
+					color = None
+					title = self.title.strip('(3)')
+					triple_lines = []
+
+					for j, data in enumerate(self.data[i]):
+
+						x = data['step']
+						y = self.smooth(data['value'].values, smooth_value)
+
+						p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
+					
+						#Update plot limit values
+						if p < min_x:
+							min_x = p
+						if q > max_x:
+							max_x = q
+						if r < min_y:
+							min_y = r
+						if s > max_y:
+							max_y = s
+
+						
+
+						if color == None:
+
+							#Draw line and store color for the first entry
+							tmp, = self.ax.plot(x, y, linestyle=style[j])
+							color = tmp.get_color()
+
+						else:
+
+							#Draw line
+							tmp, = self.ax.plot(x, y, linestyle=style[j], color = color)
+
+						triple_lines.append(tmp)
+
+					#Add legend to plot
+					self.ax.legend(labels=[f'{title}- 1', f'{title}- 2', f'{title}- 3'], loc='upper left')
+					self.line.append(triple_lines)
+					self.colors.append(color)
+
+
+
+
+				else:
+
+					x = self.data[i]['step']
+					y = self.smooth(self.data[i]['value'].values, smooth_value)
+					p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
+					
+					#Update plot limit values
+					if p < min_x:
+						min_x = p
+					if q > max_x:
+						max_x = q
+					if r < min_y:
+						min_y = r
+					if s > max_y:
+						max_y = s
+
+				   
+					#Draw line and store color
+					tmp, = self.ax.plot(x, y)
+					self.line.append(tmp)
+					self.colors.append(self.line[i].get_color())
 
 			#The scalar has no valid data
 			else:
@@ -257,10 +314,20 @@ class ScalarLabel(ttk.Label):
 		#Get line and line color
 		self.lines = lines
 		if self.lines != None:
+
 			for line in lines:
+
 				if line != None:
-					self.color = line.get_color()
+
+					if type(line) == list:
+
+						self.color = line[0].get_color()
+
+					else:
+
+						self.color = line.get_color()
 		else:
+
 			self.color = "#000000"
 
 		self.removed = False
@@ -283,9 +350,18 @@ class ScalarLabel(ttk.Label):
 		if self.lines != None:
 			for line in lines:
 				if line != None:
-					self.configure(foreground = line.get_color())
-					break
+
+					if type(line) == list:				
+
+						self.configure(foreground = line[0].get_color())
+						break
+
+					else:
+
+						self.configure(foreground = line.get_color())
+						break
 		else:
+			
 			self.configure(foreground = "#000000")
 
 	#Hover functions
@@ -297,7 +373,16 @@ class ScalarLabel(ttk.Label):
 			for i, line in enumerate(self.lines):
 
 				if line != None:
-					self.lines[i].set_linewidth(3)
+
+					if type(line) == list:
+
+						for j in range(len(line)):
+
+							line[j].set_linewidth(3)
+					else:
+
+						self.lines[i].set_linewidth(3)
+
 					self.update_fns[i]()
 
 	def on_leave(self, event):
@@ -308,7 +393,17 @@ class ScalarLabel(ttk.Label):
 			for i, line in enumerate(self.lines):
 
 				if line != None:
-					self.lines[i].set_linewidth(1)
+
+					if type(line) == list:
+
+						for j in range(len(line)):
+
+							line[j].set_linewidth(1)
+
+					else:
+
+						self.lines[i].set_linewidth(1)
+					
 					self.update_fns[i]()
 
 
@@ -318,7 +413,16 @@ class ScalarLabel(ttk.Label):
 		#Undraw lines
 		for i, line in enumerate(self.lines):
 
-			line.remove()
+			if type(line) == list:
+
+				for j in range(len(line)):
+
+					line[j].remove()
+
+			else:
+
+				line.remove()
+
 			self.update_fns[i]()
 
 		#Call for a higher level update
@@ -450,8 +554,18 @@ class PlotHandler(ttk.Frame):
 	@property
 	def get_tag_choice(self):
 		key = self.scalar_choice.get()
-		index = self.scalar_tags.index(key)       
-		return self.full_scalar_tags[index]  
+		index = self.scalar_tags.index(key) 
+
+		#The '(3)' in the tag indicates there are 3 tags to be drawn together
+		if '(3)' in key:
+
+			new_key = self.full_scalar_tags[index].strip(' (3)') 
+			triple_keys = [(new_key + f' - {i}:') for i in range(1,4)]
+			return triple_keys
+
+		else:
+					      
+			return self.full_scalar_tags[index]  
 
 	#Add a plot
 	def add_plot(self):
@@ -630,10 +744,52 @@ class PlotHandler(ttk.Frame):
 
 
 	#Updates scalar tags listing them from the loaded ones
+	#> Now tags with the same name followed by ' - 1:' will be grouped together 
 	def update_tags(self, tags, full_tags):
 
 		self.full_scalar_tags = full_tags   
 		self.scalar_tags = tags 
+
+		#Pattern to match multiple tags
+		pattern = re.compile(r'.* - [123]$')
+
+		triple_tags = []
+		new_tags = []
+		to_pop = []
+		new_full_tags = []
+		full_triple_tags = []
+
+		#Search in every tag for matches and store tags and full tags in separate lists	
+		for i, tag in enumerate(self.scalar_tags):
+
+			if pattern.match(tag):
+
+				triple_tags.append(tag)
+				full_triple_tags.append(self.full_scalar_tags[i])
+				to_pop.append(i)
+
+		#Pop matching tas from original lists
+		for i in reversed(to_pop):
+			self.scalar_tags.pop(i)
+			self.full_scalar_tags.pop(i)
+
+		assert len(triple_tags) == len(full_triple_tags)
+
+		#Create new entries for the OptionMenu
+		for i in range(int(len(triple_tags)/3)):
+
+			new_tags.append(triple_tags[i*3].strip(' - 1') + ' (3)')
+			new_full_tags.append(full_triple_tags[i*3].strip(' - 1:') + ' (3)')
+
+		#Extend the tag lists with the new entries and sort them in the same order
+		#>the sort order is important for later retrieval
+		self.scalar_tags.extend(new_tags)
+		self.full_scalar_tags.extend(new_full_tags)
+
+		sorted_indices = sorted(range(len(self.scalar_tags)), key=lambda i: self.scalar_tags[i])
+
+		self.scalar_tags = [self.scalar_tags[i] for i in sorted_indices]
+		self.full_scalar_tags = [self.full_scalar_tags[i] for i in sorted_indices]
 
 		#Enable adding plots
 		self.option_menu.state(["!disabled"])
