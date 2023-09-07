@@ -5,9 +5,11 @@ import numpy as np
 import os
 import copy
 import re
+import random
 
 #Matplotlib plot utilities and tk wrapper
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -17,6 +19,8 @@ try:
 	from matplotlib.backends.backend_tkagg import NavigationToolbar2TkAgg
 except ImportError:
 	from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as NavigationToolbar2TkAgg
+
+from loaded_scalar import LoadedScalar
 
 import cv2
 
@@ -77,7 +81,7 @@ class Toolbar(NavigationToolbar2TkAgg):
 #Frame used to contain Matplotlibs tk wrapper; handles low level plot functions
 class PlotContainer(ttk.Frame):
 
-	def __init__(self, container, scalars, scalar_choice, **args):
+	def __init__(self, container, scalar_choice, **args):
 
 		#Initialize frame and figure
 		tk.Frame.__init__(self, container, **args)
@@ -97,31 +101,50 @@ class PlotContainer(ttk.Frame):
 		self.tool_frame.pack(fill = tk.X)
 		self.coord = self.toolbar.message
 
-		#Initialize scalar defining arrays
-		self.scalars = scalars
-		self.scalar_name = scalar_choice
-		self.line = []
-		self.colors = []
-		self.data = []  
+		self.scalar_choice = scalar_choice
 
-		#Translate scalars to arrays
-		self.data_from_scalar() 
+		#Store dark/light enough colors
+		self.matplot_colors = [color for key, color in mcolors.CSS4_COLORS.items() if self.is_dark_color(color)]
+		random.shuffle(self.matplot_colors) 
 
 
 	#Smooth function; implemented after the analog Tensorboard feature
 	def smooth(self, scalars, weight):
-		#check for NaN
-		last = scalars[0] if np.isfinite(scalars[0]) else 0.0
-		smoothed = np.convolve(np.ones(len(scalars)), scalars, mode='same') / len(scalars)
-		smoothed[0] = last
-		for i in range(1, len(scalars)):
-			#smooth if not NaN; else use last value
-			if not np.isfinite(scalars[i]):
-				smoothed[i] = smoothed[i-1]
-			else:
-				smoothed[i] = last * weight + (1 - weight) * scalars[i]
-				last = smoothed[i]
-		return smoothed
+		#check for NaNs and bad scalars
+		if len(scalars) > 0:
+
+			last = scalars[0] if np.isfinite(scalars[0]) else 0.0
+			smoothed = np.convolve(np.ones(len(scalars)), scalars, mode='same') / len(scalars)
+			smoothed[0] = last
+			for i in range(1, len(scalars)):
+				#smooth if not NaN; else use last value
+				if not np.isfinite(scalars[i]):
+					smoothed[i] = smoothed[i-1]
+				else:
+					smoothed[i] = last * weight + (1 - weight) * scalars[i]
+					last = smoothed[i]
+			return smoothed
+
+		else:
+
+			return None
+
+	#Checks if a color's luminance is within the chosen threshold
+	def is_dark_color(self, color):
+
+		# Define a threshold luminance value to filter lighter colors
+		threshold_high = 0.7  
+		threshold_low = 0.3
+		
+		# Convert color to RGB
+		rgb = mcolors.to_rgba(color)[:3]
+		
+		# Calculate luminance (brightness) using the formula for relative luminance
+		luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+		
+		# Check if the color is darker than the threshold
+		return threshold_low < luminance < threshold_high
+
 
 	#Clears the plot
 	def clear(self):
@@ -130,132 +153,122 @@ class PlotContainer(ttk.Frame):
 		self.ax.clear()
 		self.canvas.draw()
 
-		#Reset scalar choices arrays
-		self.scalars = []
-		self.colors = []
-
-	#Gets data from scalars
-	def data_from_scalar(self):
-
-		#Delete previous data
-		del self.data
-		self.data = []  
-
-
-		#Gather correct values
-		for i in range(len(self.scalars)):
-
-			if type(self.scalar_name) == list:
-
-				data = [self.scalars[i][self.scalars[i]['tag'] == self.scalar_name[j]] for j in range(len(self.scalar_name))]
-				self.data.append(data)  
-
-			else:	
-				 
-				data = self.scalars[i][self.scalars[i]['tag'] == self.scalar_name]   
-				self.data.append(data)    
+		#Clear the lines associated to every LoadedScalar
+		for scalar in LoadedScalar.get_loaded_scalars():
+			scalar.clear_lines(self.scalar_choice)
 
 
 	#Updates the plot with the scalars data
 	def update_plot(self, smooth_value):
 
-		#Initialize min/max values
-		min_x = 0
-		max_x = 0
-		min_y = 0
-		max_y = 0
+		#Initialize plot limit array
+		limit_values = []
 
 		#Clear plot and reset plot relative arrays
-		self.ax.clear()
-		self.line = []
-		self.colors = []       
+		self.ax.clear()     
 
+		#For every scalar associated to all the LoadedScalar
+		for k, scalar in enumerate(LoadedScalar.get_loaded_scalars()):
 
-		for i in range(len(self.scalars)):
+			matplot_color = self.matplot_colors[k]
 
-			#Gather plot data
-			self.data_from_scalar()
-			if len(self.data[i]) > 0:
+			#Load data
+			scalar.update_data_dict(self.scalar_choice)
 
-				if type(self.data[i]) == list:
+			#Handle multiple tags
+			if type(self.scalar_choice) == list:
+
+				choice = self.scalar_choice[0]
+
+			else:
+
+				choice = self.scalar_choice
+
+			#Calculate x and y, and plot
+			if choice in scalar.data.keys():
+
+				#Handle multiple tags
+				if type(scalar.data[choice]) == list:
 
 					style = ['-', '--', ':']
-					color = None
 					title = self.title.strip('(3)')
 					triple_lines = []
 
-					for j, data in enumerate(self.data[i]):
+					for j, data in enumerate(scalar.data[choice]):
 
 						x = data['step']
 						y = self.smooth(data['value'].values, smooth_value)
 
-						p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
-					
-						#Update plot limit values
-						if p < min_x:
-							min_x = p
-						if q > max_x:
-							max_x = q
-						if r < min_y:
-							min_y = r
-						if s > max_y:
-							max_y = s
+						#Non-existent scalar or not valid data
+						if not type(y) == np.ndarray:
 
-						
+							scalar.add_line(choice, None)
+							continue
 
-						if color == None:
+						p, q, r, s = np.min(x), np.max(x), np.min(y), np.max(y)
+						limit_values.append([p, q, r, s])
+
+						if scalar.color == None:
 
 							#Draw line and store color for the first entry
-							tmp, = self.ax.plot(x, y, linestyle=style[j])
-							color = tmp.get_color()
+							tmp, = self.ax.plot(x, y, linestyle=style[j], color = matplot_color)
+							scalar.color = matplot_color
 
 						else:
 
 							#Draw line
-							tmp, = self.ax.plot(x, y, linestyle=style[j], color = color)
+							tmp, = self.ax.plot(x, y, linestyle=style[j], color = scalar.color)
 
 						triple_lines.append(tmp)
 
 					#Add legend to plot
 					self.ax.legend(labels=[f'{title}- 1', f'{title}- 2', f'{title}- 3'], loc='upper left')
-					self.line.append(triple_lines)
-					self.colors.append(color)
-
-
-
+					scalar.add_line(choice, triple_lines)
 
 				else:
 
-					x = self.data[i]['step']
-					y = self.smooth(self.data[i]['value'].values, smooth_value)
-					p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
-					
-					#Update plot limit values
-					if p < min_x:
-						min_x = p
-					if q > max_x:
-						max_x = q
-					if r < min_y:
-						min_y = r
-					if s > max_y:
-						max_y = s
+					x = scalar.data[choice]['step']
+					y = self.smooth(scalar.data[choice]['value'].values, smooth_value)
 
+					#Non-existent scalar or not valid data
+					if not type(y) == np.ndarray:
+
+						scalar.add_line(choice, None)
+						continue
+
+					p, q,  r, s = np.min(x), np.max(x), np.min(y), np.max(y)
+					limit_values.append([p, q, r, s])
 				   
 					#Draw line and store color
-					tmp, = self.ax.plot(x, y)
-					self.line.append(tmp)
-					self.colors.append(self.line[i].get_color())
+					if scalar.color == None:
+
+							#Draw line and store color for the first entry
+							tmp, = self.ax.plot(x, y, color = matplot_color)
+							scalar.color = matplot_color
+
+					else:
+
+						#Draw line
+						tmp, = self.ax.plot(x, y, color = scalar.color)
+
+			
+					scalar.add_line(choice, tmp)
 
 			#The scalar has no valid data
 			else:
 
-				self.line.append(None)
-				self.colors.append(None)
+				scalar.add_line(choice, None)
 
-		
+		#Calculate plot limits
+		limit_values = np.array(limit_values)
+		min_x = np.min(limit_values[:,0])
+		max_x = np.max(limit_values[:,1])
+		min_y = np.min(limit_values[:,2])
+		max_y = np.max(limit_values[:,3])
+
 		#Set plot limits, title and grid and draw
 		self.ax.set_xlim(min_x-10, max_x+10)
-		self.ax.set_ylim(min_y-10, max_y+50)   
+		self.ax.set_ylim(min_y-10, max_y+25)   
 		self.ax.grid(True) 
 		self.ax.set_title(self.title)    
 		self.canvas.draw()
@@ -300,139 +313,6 @@ class ScrollableFrame(ttk.Frame):
 		scrollbar.pack(side="right", fill="y")
 
 
-#======================== SCALAR LABELS ======================
-#Conveniently defined labels with hover methods
-class ScalarLabel(ttk.Label):
-
-	def __init__(self, container, text, lines, update_fns):
-
-		#Initialize label
-		self.font = ("Verdana", 9)
-		super().__init__(container, text = text, font = self.font)
-		self.color = None
-
-		#Get line and line color
-		self.lines = lines
-		if self.lines != None:
-
-			for line in lines:
-
-				if line != None:
-
-					if type(line) == list:
-
-						self.color = line[0].get_color()
-
-					else:
-
-						self.color = line.get_color()
-		else:
-
-			self.color = "#000000"
-
-		self.removed = False
-
-		#Assign the color to the label
-		self.configure(foreground = self.color)
-		
-		#Reference to the update function (fast update)
-		self.update_fns = update_fns
-
-		# Bind the hover functions to the <Enter> and <Leave> events
-		self.bind("<Enter>", self.on_enter)       
-		self.bind("<Leave>", self.on_leave)
-
-	#Method called externally; updates the assigned line if plot has changed
-	def update_lines(self, lines, update_fns):
-		
-		self.lines = lines
-		self.update_fns = update_fns
-		if self.lines != None:
-			for line in lines:
-				if line != None:
-
-					if type(line) == list:				
-
-						self.configure(foreground = line[0].get_color())
-						break
-
-					else:
-
-						self.configure(foreground = line.get_color())
-						break
-		else:
-			
-			self.configure(foreground = "#000000")
-
-	#Hover functions
-	def on_enter(self, event):
-
-		#Highlight label and assigned line
-		self.configure(foreground="black")
-		if self.lines != None:
-			for i, line in enumerate(self.lines):
-
-				if line != None:
-
-					if type(line) == list:
-
-						for j in range(len(line)):
-
-							line[j].set_linewidth(3)
-					else:
-
-						self.lines[i].set_linewidth(3)
-
-					self.update_fns[i]()
-
-	def on_leave(self, event):
-
-		#Deselect label and line
-		self.configure(foreground=self.color)
-		if self.lines != None:
-			for i, line in enumerate(self.lines):
-
-				if line != None:
-
-					if type(line) == list:
-
-						for j in range(len(line)):
-
-							line[j].set_linewidth(1)
-
-					else:
-
-						self.lines[i].set_linewidth(1)
-					
-					self.update_fns[i]()
-
-
-	#Removes this scalar label's lines
-	def remove_lines(self):
-
-		#Undraw lines
-		for i, line in enumerate(self.lines):
-
-			if type(line) == list:
-
-				for j in range(len(line)):
-
-					line[j].remove()
-
-			else:
-
-				line.remove()
-
-			self.update_fns[i]()
-
-		#Call for a higher level update
-		self.lines = None
-		self.removed = True
-	   
-
-
-
-
 
 
 #====================PLOT HANDLER====================
@@ -447,8 +327,6 @@ class PlotHandler(ttk.Frame):
 
 		self.root_dir = os.getcwd()
 		self.icon = tk.PhotoImage(file = './icons/minus.gif')
-
-		self.scalars = []
 
 		self.scalar_tags = tags
 		self.full_scalar_tags = full_tags 
@@ -498,15 +376,6 @@ class PlotHandler(ttk.Frame):
 
 			self.remove_plot(self.plots[0])
 
-
-	#Clears remeved lines data
-	def remove_line(self, index):
-
-		for plot in self.plots:
-			plot.line.pop(index)
-			plot.colors.pop(index)
-			plot.data.pop(index)
-
 	 
 	#Gets the correct plot sizes based on the window size
 	@property
@@ -545,9 +414,12 @@ class PlotHandler(ttk.Frame):
 	#Calls the update function for every plot
 	def update_plots(self, smooth_value):
 
+		for scalar in LoadedScalar.get_loaded_scalars():
+
+			scalar.clear_all_lines()
+
 		for plot in self.plots:
 
-			plot.scalars = self.scalars
 			plot.update_plot(smooth_value)
 
 	#Returns the full tag 
@@ -573,7 +445,7 @@ class PlotHandler(ttk.Frame):
 		#Initialize frame (container), plot, remove button, and coordinates label and place them in the frame
 		new_frame = ttk.Frame(self)
 
-		new_plot = PlotContainer(new_frame, self.scalars, self.get_tag_choice)
+		new_plot = PlotContainer(new_frame, self.get_tag_choice)
 		new_plot.title = self.scalar_choice.get()
 		new_plot.grid(row = 0, column = 0)
 
@@ -641,6 +513,7 @@ class PlotHandler(ttk.Frame):
 			if plot == rm_plot:
 
 				plt.close(plot.fig)
+				self.plots[i].clear()
 				self.plots[i].destroy()
 				self.labels[i].destroy()
 				self.frames[i].destroy()
@@ -659,9 +532,6 @@ class PlotHandler(ttk.Frame):
 
 	#Calls the clear function for every plot
 	def clear(self):
-		
-		del self.scalars
-		self.scalars = []
 
 		for plot in self.plots:
 			plot.clear()

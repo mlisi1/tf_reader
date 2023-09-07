@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import re
+import copy
 
 #==========INFO WINDOW=============
 #Window with info on the scalar parameters 
@@ -300,3 +301,57 @@ class SelectScalarWin(tk.Toplevel):
 			else:
 
 				self.update_entries()
+
+
+
+#================== PREFERENCES =====================
+#Window used to hold and choose all the preferences
+#>still in development
+class Preferences(tk.Toplevel):
+
+	def __init__(self, parent):
+
+		super().__init__()
+		tk.Tk.wm_title(self, "Preferences")
+		self.protocol('WM_DELETE_WINDOW', self.close)
+		self.resizable(tk.FALSE, tk.FALSE)
+		self.geometry("250x150")
+
+		self.parent = parent
+
+		self.order_label = ttk.Label(self, text = "Order scalars based on tag:")
+		self.order_label.grid(row = 0, column = 0, padx = 10, pady = 5)
+
+		self.order_choice = tk.StringVar()
+		self.scalar_tags = copy.deepcopy(self.parent.plot_container.full_scalar_tags)
+		self.order_menu  = ttk.OptionMenu(self, self.order_choice, self.scalar_tags[0], *self.scalar_tags)
+		self.order_menu.config(width = 23)
+		self.order_menu.grid(row = 1, column = 0, padx = 20, pady = 5)
+
+
+		self.save_butt = ttk.Button(self, text = "Save", command = self.save)
+		self.save_butt.grid(row = 10, column = 0, padx = 15, pady = 10, sticky = "NW")
+
+		self.close_butt = ttk.Button(self, text = "Close", command = self.close)
+		self.close_butt.grid(row = 10, column = 0, padx = 15, pady = 10, sticky = "NE")
+
+	#Apply preferences
+	def save(self):
+
+		if not self.order_choice.get() == '':
+			
+			self.parent.order_choice = self.order_choice.get()
+
+		else:
+
+			self.parent.order_choice = None
+
+		self.parent.update_scalar_labels()
+
+		self.close()
+
+	def close(self):
+
+		self.parent.toplevel = None
+
+		self.destroy()

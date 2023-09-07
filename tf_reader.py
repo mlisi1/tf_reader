@@ -11,9 +11,10 @@ import tkinter as tk
 from tkinter import ttk
 
 #local imports
+from loaded_scalar import LoadedScalar
 from sessionloader import SessionLoader
-from scalar_widgets import ScrollableFrame, ScalarLabel, PlotHandler
-from toplevels import InfoWindow, SelectScalarWin
+from scalar_widgets import ScrollableFrame, PlotHandler
+from toplevels import InfoWindow, SelectScalarWin, Preferences
 
 
 
@@ -34,8 +35,6 @@ class TFReaderWin(tk.Tk):
 		self.grid_rowconfigure(0, weight=20)
 		self.grid_columnconfigure(0, weight = 30)
 
-		self.rm_icon = tk.PhotoImage(file = './icons/minus.gif')
-
 		self.root_dir = os.getcwd()
 
 		self.menu_bar = tk.Menu(self)
@@ -43,9 +42,15 @@ class TFReaderWin(tk.Tk):
 		self.file_menu.add_command(label = "Add single training folder", command = self.add_training_dir_bringup)
 		self.file_menu.add_command(label = "Add tag folder", command = self.add_tag_dir_bringup)
 
-		self.menu_bar.add_cascade(labe = "File", menu = self.file_menu)
-		self.config(menu = self.menu_bar)
+		self.config_menu = tk.Menu(self.menu_bar, tearoff = 0)
+		self.config_menu.add_command(label = "Preferences", command = self.preferences_bringup)
 
+		self.order_choice = None		
+
+		self.menu_bar.add_cascade(labe = "File", menu = self.file_menu)
+		self.menu_bar.add_cascade(labe = "Config", menu = self.config_menu)
+
+		self.config(menu = self.menu_bar)
 
 		#Scalar list frame initialization
 		self.scalar_container = ScrollableFrame(self, 20, 2, width = 300, height = 400)
@@ -55,11 +60,6 @@ class TFReaderWin(tk.Tk):
 		self.save_butt = ttk.Button(self, text = "Save scalar data", command = self.save_scalar_data)
 		self.save_butt.state(["disabled"])
 		self.save_butt.grid(row = 0, column = 2, pady = 30, sticky = "SE", padx = (20, 20))
-
-		#Array of scalars and their relative parameters
-		self.scalars = []
-		self.params = []
-		self.max_values = []
 
 		#SessionLoader; handles workdir scanning and file loading/parsing
 		self.loader = SessionLoader(workdir)
@@ -84,12 +84,6 @@ class TFReaderWin(tk.Tk):
 		self.reward_choice = tk.StringVar()
 		self.reward_choice.set(self.available_rewards[0])
 
-		#Scalar list GUI arrays
-		self.scalar_labels = []
-		self.scalar_buttons = []
-		self.remove_buttons = []
-		self.scalar_names = []
-
 		#Button to add scalars initialization
 		self.add_scalar_button = ttk.Button(self, text = "Add Scalar", command = self.add_scalar_fn)
 		self.add_scalar_button.grid(row = 0, column = 2, sticky = "NE", pady = 100, padx = (0,180))
@@ -99,8 +93,7 @@ class TFReaderWin(tk.Tk):
 		self.clear_button.grid(row = 0, column = 2, sticky = "NE", pady = 100, padx = (0,50))
 
 		#Toplevel variable; used to only allow one additional window at a time
-		self.toplevel = None
-		
+		self.toplevel = None		
 
 		#Model tag choice variables initialization
 		self.tags = [""]
@@ -109,7 +102,6 @@ class TFReaderWin(tk.Tk):
 		#Plot Handler class; hadles plot adding, removing and rescaling
 		self.plot_container = PlotHandler(self, self.tags, self.full_tags)
 		self.plot_container.grid(row = 0, column = 0, sticky = "NW") 
-
 
 		self.save_plots_button = ttk.Button(self, text = "Save Plots", command = self.plot_container.save_multiple_plots)
 		self.save_plots_button.grid(row = 0, column = 2, padx = (0, 170), sticky = "SE", pady = 30)       
@@ -141,14 +133,16 @@ class TFReaderWin(tk.Tk):
 		self.tags = []
 		self.full_tags = []
 
-		for tag in self.scalars[0]['tag']:
+		for scalar in LoadedScalar.get_loaded_scalars():		
 
-			short_tag = tag[7:-1]
+			for tag in scalar.scalar['tag']:
 
-			if short_tag not in self.tags:
-				
-				self.tags.append(short_tag)
-				self.full_tags.append(tag)
+				short_tag = tag[7:-1]
+
+				if short_tag not in self.tags:
+					
+					self.tags.append(short_tag)
+					self.full_tags.append(tag)
    
 	#Gets the chosen smooth value from the slider widget
 	@property
@@ -181,16 +175,6 @@ class TFReaderWin(tk.Tk):
 		#Check if new scalars are added to update tags choice menu entries
 		if self.loader.entries_update:
 			self.update_menu_entries()
-		#Checks if a label has been triggered for removal
-		if len(self.scalar_labels)>1:
-			for i, label in enumerate(self.scalar_labels):
-				if label.removed:
-					self.on_line_remove(i)
-					break
-		#If there is only one line, simply clear all
-		elif len(self.scalar_labels)==1:
-			if self.scalar_labels[0].removed:
-				self.clear()
 
 		#If there are no plots, disable save plot button
 		if len(self.plot_container.plots) == 0:
@@ -221,31 +205,16 @@ class TFReaderWin(tk.Tk):
 		self.previous_size = curr_size
 
 	#==============PLOT HIGH LEVEL FUNCTIONS===============
-	#Clears the plot, scalar labels and resets attributes
+	#Clears the plots and deletes scalar labels
 	def clear(self):
 
-		#Delete attributes and re-initialize them
-		del self.scalars 
-		del self.scalar_names
-		del self.params 
-		del self.max_values
-		self.scalars = []
-		self.scalar_names = []
-		self.params = []
-		self.max_values = []
+		for i in range(len(LoadedScalar.get_loaded_scalars())):
 
-		#Deactivate save button
-		self.save_butt.state(["disabled"])
+			scalars = LoadedScalar.get_loaded_scalars()
 
-		#The low level clear function
-		self.plot_container.clear()
+			scalars[0].label.remove_lines()
+
 		self.plot_container.flush_tags()
-
-		#Clear the scalar labels
-		self.update_scalar_labels()
-
-
-
 
 	#Standard plot update method: redraws the plot and updates existing scalar label's line variable
 	def update_plot(self, smooth_value):
@@ -254,107 +223,32 @@ class TFReaderWin(tk.Tk):
 		self.smooth_value_label.config(text = f'{self.get_smooth_value:.2f}')
 
 		#Update plots
-		self.plot_container.update_plots(self.get_smooth_value)        
-		
-		#Update scalar labels lines   
-		for i in range(len(self.scalar_labels)):
-			if len(self.plot_container.plots) > 0:
-				lines = [plot.line[i] for plot in self.plot_container.plots]
-				updates = [plot.fast_update for plot in self.plot_container.plots]
+		self.plot_container.update_plots(self.get_smooth_value)
 
-			else:
-
-				lines = None
-				updates = None
-
-			self.scalar_labels[i].update_lines(lines, updates)
 
 	#================GUI ELEMENT UPDATE FUNCTIONS================================
 	#Updates the labes by destroying and recreating according to the scalars
 	def update_scalar_labels(self):
 
-		#If there are labels, destroy them
-		if len(self.scalar_labels) > 0:            
-			for i in range(len(self.scalar_labels)):
-				self.scalar_labels[i].destroy()
-				self.scalar_buttons[i].destroy()
-				self.remove_buttons[i].destroy()
-			self.scalar_labels = []
-			self.scalar_buttons = []
-			self.remove_buttons = []
+		max_values = [scalar.get_max(self.order_choice) for scalar in LoadedScalar.get_loaded_scalars()]
+		indexes = np.argsort(max_values)[::-1]
+
+		loaded_scalars = LoadedScalar.get_loaded_scalars()
+		loaded_scalars = [loaded_scalars[i] for i in indexes]
+
+		for i, scalar in enumerate(loaded_scalars):
+
+			scalar.remove_gui()
+
+			fns = [plot.fast_update for plot in self.plot_container.plots]
+			scalar.swap_functions(fns)		
+
 		
-		#index used if some scalars does not have valid data
-		j = 0
+			scalar.restore_gui(i)
 
-		#If there are scalars, create labels and buttons
-		if len(self.scalar_names) > 0:
-			for i in range(len(self.scalar_names)):
+			scalar.label.on_leave(None)
 
-				#Gather lines and correct update functions
-				if len(self.plot_container.plots) > 0:
-					lines = [plot.line[i] for plot in self.plot_container.plots]
-					updates = [plot.fast_update for plot in self.plot_container.plots]
-
-				else:
-
-					lines = None
-					updates = None
-
- 
-				#instantiate ScalarLabel class; uses fast update method instead of normal update
-				tmp = ScalarLabel(self.scalar_container.scrollable_frame, text = f'{self.scalar_names[i]}', lines = lines, update_fns = updates)
-				tmp.grid(column = 0, row = j, sticky = "NW")
-
-				#create partial for instancing the Info window; for some reason lambda definition was not working
-				cmd = partial(self.info_win_bringup, self.params[i], self.scalar_names[i])
-				
-
-				#instantiate Info Button                
-				tmp_butt = ttk.Button(self.scalar_container.scrollable_frame, text = "Info", width = 4, command = cmd)              
-				tmp_butt.grid(column = 1, row = j, padx = 5)
-
-				tmp_rm = ttk.Button(self.scalar_container.scrollable_frame, image = self.rm_icon, width = 5, command = tmp.remove_lines)
-				tmp_rm.grid(column = 2, row = j, padx = 5)
-
-				#update button and labels list
-				self.scalar_labels.append(tmp)
-				self.scalar_buttons.append(tmp_butt)
-				self.remove_buttons.append(tmp_rm)
-				j+=1
-
-
-	#Method called on line removal; clears variables and updates scalar labels
-	def on_line_remove(self, index = 0):
-
-		#Remove label
-		self.scalar_labels[index].grid_remove()
-		self.scalar_labels[index].destroy()
-		self.scalar_labels.pop(index)
-
-		#Remove Info button
-		self.scalar_buttons[index].grid_remove()
-		self.scalar_buttons[index].destroy()
-		self.scalar_buttons.pop(index)
-
-		#Remve remove buttons
-		self.remove_buttons[index].grid_remove()
-		self.remove_buttons[index].destroy()
-		self.remove_buttons.pop(index)
-
-		#Pop removed scalar values
-		#>popping self.scalars[index] removes it also from PlotHandler.plots
-		self.scalar_names.pop(index)
-		self.params.pop(index)
-		self.max_values = np.delete(self.max_values, index)
-		self.scalars.pop(index)
-
-		#Call other update functions
-		self.plot_container.remove_line(index)
-		self.update_plot(self.get_smooth_value)
-		self.update_scalar_labels()
-
-
-
+	#Updtaes OptionMenu entries
 	def update_menu_entries(self):
 
 		#Model choice variables
@@ -370,9 +264,6 @@ class TFReaderWin(tk.Tk):
 		self.available_rewards.append("All")        
 
 		self.loader.entries_update = False
-		
-
-
 
 
 
@@ -394,17 +285,7 @@ class TFReaderWin(tk.Tk):
 
 			self.toplevel.lift()
 
-	#Bringup Info window if there is no toplevel already; instantiated by every Info button
-	def info_win_bringup(self, params, scalar_name):
-
-		if self.toplevel is None:
-
-			self.toplevel = InfoWindow(self, params, scalar_name)
-
-		else:
-
-			self.toplevel.lift()
-
+	
 	#Bringup for path asking window; used to load external scalars
 	def add_training_dir_bringup(self):
 
@@ -420,7 +301,7 @@ class TFReaderWin(tk.Tk):
 		if tmp == -1:
 			tk.messagebox.showerror("Error", "The selected folder does not contain a valid scalar.")
 
-
+	#Bringup for path asking window; used to load external tag folder (multiple trainings that only differ net sizes)
 	def add_tag_dir_bringup(self):
 
 		folder_path = tk.filedialog.askdirectory(title = "Load scalars from tag directory",
@@ -437,11 +318,17 @@ class TFReaderWin(tk.Tk):
 
 		#SessionLoader.generate_session() returns -1 in case of any failure
 		# while preprocessing data
-	  
 
+	#Bringup for preferences menu
+	def preferences_bringup(self):
 
+		if self.toplevel is None:
 
+			self.toplevel = Preferences(self)
 
+		else:
+
+			self.toplevel.lift()  
 
 
 	#======================LOAD FUNCTIONS =====================================
@@ -460,46 +347,14 @@ class TFReaderWin(tk.Tk):
 			
 			if 'tag' in tmp[0].keys():
 
-				self.scalars.append(tmp[0])
-				self.scalar_names.append(tmp[1])
-				self.params.append(tmp[2])     
+				scalar, name, params = tmp    
+				fns = [plot.fast_update for plot in self.plot_container.plots]
+				new_scalar = LoadedScalar(scalar, params, name, self.scalar_container.scrollable_frame, fns)
 
 			else:
 
 				raise_err = True       
-
-		if len(self.scalars) > 1:
-			
-			#Append max average reward during test for each scalar
-			max_test_value = np.empty(0)
-			for i in range(len(self.scalars)):
-				
-				for j, tag in enumerate(self.scalars[i]['tag']):
-
-					if "Avg" in tag and "Network" in tag and "Test" in tag and not "Best" in tag:
-
-						x = self.scalars[i][self.scalars[i]['tag'].values == tag]
-						max_test_value = np.append(max_test_value, x['value'].values[-1])
-						break
-
-					#Handles when the tag is not found
-					#>could be caused by a training never finished
-					else:
-						
-						if j == len(self.scalars[i]['tag']) - 1:                        
-
-							max_test_value = np.append(max_test_value, -1000)
-			
-
-
-			#Sort the array and get the indexes
-			indexes = np.argsort(max_test_value)[::-1] 
-			self.max_values = np.sort(max_test_value)[::-1]
-				 
-			self.scalars = [self.scalars[i] for i in indexes]
-			self.scalar_names = [self.scalar_names[i] for i in indexes]
-			self.params = [self.params[i] for i in indexes]   
-
+ 
 			#Activate save button
 			self.save_butt.state(["!disabled"])                   
 
@@ -507,7 +362,6 @@ class TFReaderWin(tk.Tk):
 		#Update plot
 		if self.plot_container is not None:
 
-			self.plot_container.scalars = self.scalars
 			self.update_plot(self.get_smooth_value)
 			self.update_scalar_labels()
 			self.get_tags()
@@ -515,8 +369,6 @@ class TFReaderWin(tk.Tk):
 
 
 		return -1 if raise_err else 0
-
-
 
 
 	#======================SAVE FUNCTIONS =====================================
@@ -537,29 +389,20 @@ class TFReaderWin(tk.Tk):
 		file_path = tk.filedialog.asksaveasfilename(parent = self, initialdir = filepath, initialfile = filename, 
 					filetypes=(("Text files", "*.txt"), ("All files", "*.*")), defaultextension = '.txt')
 	  
+		loaded_scalars = LoadedScalar.get_loaded_scalars()
 
-		if len(self.scalars) > 1:
+		if len(loaded_scalars) > 1:
 
 			with open(file_path, 'w') as f:
 
+				criterion = "Max Test Avg:" if self.order_choice == None else f'Max {self.order_choice}'
+
 				#Write relevant infos
 				f.write("Scalars Plotted:\n")      
-				for i in range(len(self.scalars)):
+				for scalar in loaded_scalars:
 
-					name = self.scalar_names[i].split('\n')
-					max_value = self.max_values[i] if self.max_values[i] != -1000 else "NO DATA"
+					name = scalar.scalar_name.split('\n')
+					max_value = scalar.max_value if scalar.max_value != -1000 else "NO DATA"
 
-					f.write(f'{name[0]}|{name[1]}  			 Max Test Avg: {max_value}\n')
+					f.write(f'{name[0]}|{name[1]}  			 {criterion} {max_value}\n')
 
-
-			
-
-		
-
-
-
-
-
-
-
-	
