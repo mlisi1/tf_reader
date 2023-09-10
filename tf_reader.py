@@ -238,12 +238,7 @@ class TFReaderWin(tk.Tk):
 
 		for i, scalar in enumerate(loaded_scalars):
 
-			scalar.remove_gui()
-
-			fns = [plot.fast_update for plot in self.plot_container.plots]
-			scalar.swap_functions(fns)		
-
-		
+			scalar.remove_gui()		
 			scalar.restore_gui(i)
 
 			scalar.label.on_leave(None)
@@ -372,7 +367,7 @@ class TFReaderWin(tk.Tk):
 
 
 	#======================SAVE FUNCTIONS =====================================
-	#Saves currently plotted scalars to a .txt file
+	#Saves currently plotted scalars to a .txt file ordered by the chosen metric
 	def save_scalar_data(self):
 
 		#Use datetime for filename
@@ -390,6 +385,8 @@ class TFReaderWin(tk.Tk):
 					filetypes=(("Text files", "*.txt"), ("All files", "*.*")), defaultextension = '.txt')
 	  
 		loaded_scalars = LoadedScalar.get_loaded_scalars()
+		max_values = [scalar.get_max(self.order_choice) for scalar in LoadedScalar.get_loaded_scalars()]
+		indexes = np.argsort(max_values)[::-1]
 
 		if len(loaded_scalars) > 1:
 
@@ -399,10 +396,10 @@ class TFReaderWin(tk.Tk):
 
 				#Write relevant infos
 				f.write("Scalars Plotted:\n")      
-				for scalar in loaded_scalars:
+				for i in indexes:
 
-					name = scalar.scalar_name.split('\n')
-					max_value = scalar.max_value if scalar.max_value != -1000 else "NO DATA"
+					name = loaded_scalars[i].scalar_name.split('\n')
+					max_value = loaded_scalars[i].max_value if loaded_scalars[i].max_value != -1000 else "NO DATA"
 
 					f.write(f'{name[0]}|{name[1]}  			 {criterion} {max_value}\n')
 

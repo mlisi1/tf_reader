@@ -58,6 +58,16 @@ class LoadedScalar:
 			data = self.scalar[self.scalar['tag'] == scalar_choice]   
 			self.data[scalar_choice] = data   
 
+		#Create entry for points
+		if "[Point]" not in self.data.keys():
+
+			point_tag = [tag for tag in self.scalar['tag'] if '[Point]' in tag]
+			
+			if len(point_tag)>0:
+
+				data = self.scalar[self.scalar['tag'] == point_tag[0]]
+				self.data['[Point]'] = data
+
 	@classmethod
 	#Used to retrive by other classes all existing loaded scalars
 	def get_loaded_scalars(self):
@@ -126,8 +136,16 @@ class LoadedScalar:
 					key = order_choice
 
 				x = self.scalar[self.scalar['tag'].values == key]
-				max_value = x['value'].values[-1]
-				break
+
+				if len(x) > 0:
+
+					max_value = x['value'].values[-1]
+					break
+
+				else:
+
+					max_value = -1000
+					break
 
 		self.max_value = max_value
 		return self.max_value
@@ -146,10 +164,12 @@ class LoadedScalar:
 		self.label.info_button.grid(row = row, column = 1)
 		self.label.remove_button.grid(row = row, column = 2)
 
-	#Used to update plot update functions
-	def swap_functions(self, fns):
+	#Fast update method; redraws plot canvas
+	def fast_update(self):
 
-		self.label.update_functions = fns
+		plot_container = self.label.master.master.master.master.plot_container
+		plot_container.fast_update()
+
 
 	#Bringup Info window if there is no toplevel already; instantiated by every Info button
 	def info_win_bringup(self, params, scalar_name):
@@ -179,8 +199,6 @@ class ScalarLabel(ttk.Label):
 		self.parent = parent
 		self.rm_icon = tk.PhotoImage(file = './icons/minus.gif')
 
-		self.update_functions = parent.update_functions
-
 		self.configure(foreground = self.parent.color if not self.parent.color == None else '#000000')
 
 		self.bind("<Enter>", self.on_enter)       
@@ -198,6 +216,11 @@ class ScalarLabel(ttk.Label):
 		self.configure(foreground = '#000000')
 		for i, key in enumerate(self.parent.lines.keys()):
 
+
+			if key == '[Point]':
+
+				continue
+
 			value = self.parent.lines[key]
 
 			if not value == None:
@@ -212,7 +235,7 @@ class ScalarLabel(ttk.Label):
 
 					value.set_linewidth(3)
 
-				self.update_functions[i]()
+		self.parent.fast_update()
 
 
 	#Hover functions
@@ -220,6 +243,11 @@ class ScalarLabel(ttk.Label):
 
 		self.configure(foreground = self.parent.color)
 		for i, key in enumerate(self.parent.lines.keys()):
+
+
+			if key == '[Point]':
+
+				continue
 
 			value = self.parent.lines[key]
 
@@ -237,7 +265,7 @@ class ScalarLabel(ttk.Label):
 
 			
 
-				self.update_functions[i]()
+		self.parent.fast_update()
 
 
 
@@ -248,10 +276,14 @@ class ScalarLabel(ttk.Label):
 		for i, key in enumerate(self.parent.lines.keys()):
 
 			value = self.parent.lines[key]
+		
+			if key == '[Point]':
+
+				value.remove()
+				continue
+			
 
 			if not value == None:
-
-				print(value)
 
 				if type(value) == list:
 
@@ -263,7 +295,7 @@ class ScalarLabel(ttk.Label):
 
 					value.remove()
 
-				self.update_functions[i]()
+		self.parent.fast_update()
 
 		self.info_button.destroy()
 		self.remove_button.destroy()		

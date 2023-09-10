@@ -171,7 +171,7 @@ class PlotContainer(ttk.Frame):
 		for k, scalar in enumerate(LoadedScalar.get_loaded_scalars()):
 
 			matplot_color = self.matplot_colors[k]
-
+			
 			#Load data
 			scalar.update_data_dict(self.scalar_choice)
 
@@ -214,6 +214,7 @@ class PlotContainer(ttk.Frame):
 							tmp, = self.ax.plot(x, y, linestyle=style[j], color = matplot_color)
 							scalar.color = matplot_color
 
+
 						else:
 
 							#Draw line
@@ -250,7 +251,6 @@ class PlotContainer(ttk.Frame):
 
 						#Draw line
 						tmp, = self.ax.plot(x, y, color = scalar.color)
-
 			
 					scalar.add_line(choice, tmp)
 
@@ -258,6 +258,16 @@ class PlotContainer(ttk.Frame):
 			else:
 
 				scalar.add_line(choice, None)
+
+			if "[Point]" in scalar.data.keys():
+
+				if 'Test' in choice:
+
+					x = scalar.data['[Point]']['step']
+					y = y[x]
+					tmp, = self.ax.plot(x, y, 'o', color = scalar.color, markersize = 3)
+					scalar.add_line('[Point]', tmp)
+
 
 		#Calculate plot limits
 		limit_values = np.array(limit_values)
@@ -367,6 +377,7 @@ class PlotHandler(ttk.Frame):
 
 		#Variable used to trigger root update
 		self.need_to_update = False
+
 
 
 	#Self explainatory
@@ -683,6 +694,13 @@ class PlotHandler(ttk.Frame):
 		self.add_butt.state(["disabled"])
 		self.scalar_choice.set("")
 		self.option_menu["menu"].delete(0,"end")
+
+	#Redraws every plot
+	def fast_update(self):
+
+		for plot in self.plots:
+
+			plot.canvas.draw()
   
 
 
