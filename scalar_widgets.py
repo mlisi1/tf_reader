@@ -557,6 +557,27 @@ class PlotHandler(ttk.Frame):
 			
 			plot.canvas.get_tk_widget().config(width = self.plot_size[0], height = self.plot_size[1])
 
+	#Converts from hex string color to BGR format
+	def hex_to_bgr(self, hex_string):
+		# Remove the '#' character if present
+		hex_string = hex_string.lstrip('#')
+		
+		# Check for valid hex string length (should be 6 or 8 characters)
+		if len(hex_string) not in (6, 8):
+			raise ValueError("Invalid hex string length")
+
+		# Convert the hex string to RGB values
+		r = int(hex_string[0:2], 16)
+		g = int(hex_string[2:4], 16)
+		b = int(hex_string[4:6], 16)
+
+		if len(hex_string) == 8:
+			# If the hex string has an alpha channel, extract it
+			a = int(hex_string[6:8], 16)
+			return (b, g, r, a)
+		else:
+			return (b, g, r)
+
 	#Save all the displayed plots into a single image
 	def save_multiple_plots(self):
 
@@ -604,6 +625,29 @@ class PlotHandler(ttk.Frame):
 
 		final_image = cv2.vconcat([top_image, canvas]) if bottom_image is not None else top_image
 
+		#Add scalar labels beside image
+		empty = np.zeros((final_image.shape[0], 300, 3), dtype=np.uint8)
+		empty[:,:,:] = (255, 255, 255)
+
+		loaded_scalars = LoadedScalar.get_loaded_scalars()
+		max_values = [scalar.get_max(self.master.order_choice) for scalar in LoadedScalar.get_loaded_scalars()]
+		indexes = np.argsort(max_values)[::-1]
+
+		for i, _ in enumerate(loaded_scalars):
+
+			scalar = loaded_scalars[indexes[i]]	
+
+			if scalar.color == None:
+				continue
+
+			name = scalar.scalar_name.split('\n')
+
+			cv2.putText(empty, name[0], (10, i*55+80), cv2.FONT_HERSHEY_PLAIN, 1, self.hex_to_bgr(scalar.color), 2, lineType=cv2.LINE_AA)
+			cv2.putText(empty, name[1], (10, i*55+100), cv2.FONT_HERSHEY_PLAIN, 1, self.hex_to_bgr(scalar.color), 2, lineType=cv2.LINE_AA)
+		
+
+		img = cv2.hconcat([final_image, empty])
+
 
 		#Save path file dialog
 		filepath = os.path.join(self.root_dir, 'saved_scalars/plots')
@@ -621,7 +665,7 @@ class PlotHandler(ttk.Frame):
 		)
 
 		if file_path:
-			cv2.imwrite(file_path, final_image)		
+			cv2.imwrite(file_path, img)		
 
 
 	#Updates scalar tags listing them from the loaded ones
