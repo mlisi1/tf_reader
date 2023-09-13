@@ -171,6 +171,12 @@ class PlotContainer(ttk.Frame):
 		for k, scalar in enumerate(LoadedScalar.get_loaded_scalars()):
 
 			matplot_color = self.matplot_colors[k]
+
+			used_colors = [scalar.color for scalar in LoadedScalar.get_loaded_scalars()]
+
+			while matplot_color in used_colors:
+
+				matplot_color = random.choice(self.matplot_colors)
 			
 			#Load data
 			scalar.update_data_dict(self.scalar_choice)
@@ -264,6 +270,8 @@ class PlotContainer(ttk.Frame):
 				if 'Test' in choice:
 
 					x = scalar.data['[Point]']['step']
+					if not type(x) == list:
+						continue
 					y = y[x]
 					tmp, = self.ax.plot(x, y, 'o', color = scalar.color, markersize = 3)
 					scalar.add_line('[Point]', tmp)
@@ -624,6 +632,96 @@ class PlotHandler(ttk.Frame):
 			canvas[:bottom_image.shape[0], :bottom_image.shape[1]] = bottom_image
 
 		final_image = cv2.vconcat([top_image, canvas]) if bottom_image is not None else top_image
+
+		#Add scalar labels beside image
+		empty = np.zeros((final_image.shape[0], 300, 3), dtype=np.uint8)
+		empty[:,:,:] = (255, 255, 255)
+
+		loaded_scalars = LoadedScalar.get_loaded_scalars()
+		max_values = [scalar.get_max(self.master.order_choice) for scalar in LoadedScalar.get_loaded_scalars()]
+		indexes = np.argsort(max_values)[::-1]
+
+		for i, _ in enumerate(loaded_scalars):
+
+			scalar = loaded_scalars[indexes[i]]	
+
+			if scalar.color == None:
+				continue
+
+			name = scalar.scalar_name.split('\n')
+
+			cv2.putText(empty, name[0], (10, i*55+80), cv2.FONT_HERSHEY_PLAIN, 1, self.hex_to_bgr(scalar.color), 2, lineType=cv2.LINE_AA)
+			cv2.putText(empty, name[1], (10, i*55+100), cv2.FONT_HERSHEY_PLAIN, 1, self.hex_to_bgr(scalar.color), 2, lineType=cv2.LINE_AA)
+		
+
+		img = cv2.hconcat([final_image, empty])
+
+
+		#Save path file dialog
+		filepath = os.path.join(self.root_dir, 'saved_scalars/plots')
+		os.makedirs(filepath, exist_ok=True)
+
+		filetypes = [("PNG Image File", "*.png"), ("Bitmap", "*.bmp"), ("JPEG File", "*.jpg"), ("All files", "*.*")]
+		default_extension = '.png'
+
+		file_path = tk.filedialog.asksaveasfilename(
+			parent=None,
+			initialdir=filepath,
+			initialfile="plot.png",
+			filetypes=filetypes,
+			defaultextension=default_extension
+		)
+
+		if file_path:
+			cv2.imwrite(file_path, img)		
+
+
+	#Save all the displayed plots into a single image
+	def save_multiple_plots_vertical(self):
+
+		#copy the Figures to resize them beforehand (won't loose quality)
+		images = []
+		figs = [copy.deepcopy(plot.fig) for plot in self.plots]
+
+		for fig in figs:
+
+			#Modify height and width
+			fig.set_figwidth(10)
+			fig.set_figheight(10)
+
+			#Cast to FigureCanvas
+			canvas = FigureCanvasAgg(fig)
+			canvas.draw()
+
+			#Render to RGBA
+			image = np.array(canvas.renderer.buffer_rgba())
+			image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+			images.append(image)
+
+		del figs
+
+		#Initialize top and bottom image
+		#> the plots are saved following this order:
+		# 1 	2 	3 		-> top_image
+		# 4 	5 	6 		-> bottom_image
+		left_image = images[0]
+		right_image = images[3] if len(images)>3 else None
+
+		#Horizontally concatenate images
+		for i, image in enumerate(images):
+
+			if 0<i<3:
+				left_image = cv2.vconcat([left_image, image])
+
+			if i>3:
+				right_image = cv2.vconcat([right_image, image])
+
+		#Add bottom image to a canvas the same width of top_image to concatenate vertically
+		if right_image is not None:
+			canvas = np.full(left_image.shape, 255, dtype=np.uint8)
+			canvas[:right_image.shape[0], :right_image.shape[1]] = right_image
+
+		final_image = cv2.hconcat([left_image, canvas]) if right_image is not None else left_image
 
 		#Add scalar labels beside image
 		empty = np.zeros((final_image.shape[0], 300, 3), dtype=np.uint8)
